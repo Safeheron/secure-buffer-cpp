@@ -1,0 +1,84 @@
+# Copyright 2026 Safeheron Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Superseded pull-request runs are cancelled; every main and tag commit keeps a full result.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # libstdc++
+          - { name: 'Linux x86_64 / GCC / Debug',               os: ubuntu-24.04,   cc: gcc,   cxx: g++,     config: Debug }
+          - { name: 'Linux x86_64 / GCC / Release',             os: ubuntu-24.04,   cc: gcc,   cxx: g++,     config: Release }
+          - { name: 'Linux x86_64 / Clang / ASan+UBSan',        os: ubuntu-24.04,   cc: clang, cxx: clang++, config: Debug, sanitize: true }
+          # libc++
+          - { name: 'Linux x86_64 / Clang + libc++ / Debug',    os: ubuntu-24.04,   cc: clang-18, cxx: clang++-18, config: Debug, libcxx: true }
+          - { name: 'macOS / Apple Clang / Debug',              os: macos-latest,   config: Debug }
+          # MSVC STL; the only platform whose secure_memzero uses SecureZeroMemory
+          - { name: 'Windows x64 / MSVC / Debug',               os: windows-latest, config: Debug }
+          - { name: 'Windows x64 / MSVC / Release',             os: windows-latest, config: Release }
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install libc++
+        if: matrix.libcxx
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libc++-18-dev libc++abi-18-dev
+
+      - name: Relax ASLR entropy for ASan
+        # Clang 18's ASan cannot map its shadow under the kernel's 32-bit mmap
+        # randomization and loops on DEADLYSIGNAL until the job times out.
+        if: matrix.sanitize
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+
+      - name: Configure
+        shell: bash
+        env:
+          CONFIG: ${{ matrix.config }}
+          MATRIX_CC: ${{ matrix.cc }}
+          MATRIX_CXX: ${{ matrix.cxx }}
+          SANITIZE: ${{ matrix.sanitize }}
+          LIBCXX: ${{ matrix.libcxx }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${MATRIX_CXX}" ]]; then export CC="${MATRIX_CC}" CXX="${MATRIX_CXX}"; fi
+          args=(-S . -B build -DCMAKE_BUILD_TYPE="${CONFIG}")
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then args+=(-A x64); fi
+          if [[ "${SANITIZE}" == "true" ]]; then
+            args+=("-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer"
+                   "-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined")
+          fi
+          if [[ "${LIBCXX}" == "true" ]]; then
+            args+=("-DCMAKE_CXX_FLAGS=-stdlib=libc++" "-DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++")
+          fi
+          cmake "${args[@]}"
+
+      - name: Build
+        run: cmake --build build --config ${{ matrix.config }} --parallel
+
+      - name: Test
+        env:
+          UBSAN_OPTIONS: print_stacktrace=1
+        run: ctest --test-dir build -C ${{ matrix.config }} --output-on-failure

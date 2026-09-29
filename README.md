@@ -1,2 +1,120 @@
 # secure-buffer-cpp
-C++17 base library that provides memory-safe buffer types for sensitive data. 
+
+A C++17 library of self-wiping containers for sensitive data such as keys, seeds and mnemonics. Heap memory owned by `SecureBytes` and `SecureString` is securely zeroed whenever it is released, on destruction and on reallocation. The limits of that guarantee are listed under [Security Notes](#security-notes).
+
+The library is a foundational component of Safeheron's TEE and cryptography stack.
+
+## Features
+
+- No dependencies beyond the C++ standard library and the platform.
+- Supports Linux (including AWS Nitro Enclaves), macOS, Windows, Android, iOS, SGX and WebAssembly.
+- Header-first API with a minimal compiled core: all platform-specific code is confined to `src/secure_memzero.cpp`, built as a small static library.
+- `SecureAllocator` zeroes every block before deallocating it.
+
+## Quick Start
+
+```cpp
+#include <secure-buffer/secure_buffer.h>
+
+using namespace safeheron::secure_buffer;
+
+// 32 zero-initialized bytes
+auto key = make_secure_bytes<32>();
+
+// Heap-backed string without SSO, so short secrets are wiped as well
+SecureString mnemonic("abandon abandon abandon ... about");
+
+// Read-only access through a non-owning view (no copy)
+std::string_view v = mnemonic.view();
+std::string_view first_word = v.substr(0, v.find(' '));
+
+// Import from std::string
+std::string legacy = get_secret();
+SecureBytes bytes = to_secure_bytes(legacy);
+SecureString str = to_secure_string(legacy);
+
+// Constant-time comparison
+if (constant_time_equal(key, expected_key)) { /* match */ }
+
+// Export to std::string; the result is not protected
+std::string unsafe = to_unsecure_string(bytes);
+```
+
+## Types
+
+| Type | Description |
+|------|-------------|
+| `SecureBytes` | `std::vector<uint8_t, SecureAllocator<uint8_t>>`: the full vector interface, wiped on every deallocation. |
+| `SecureString` | Length-aware string backed by `SecureBytes`. It has no small-string optimization, whose inline buffer would bypass the allocator. Read-only queries go through `view()`. |
+| `SecureAllocator<T>` | Allocator that calls `secure_memzero` before each deallocation. |
+| `secure_memzero` | Portable memory zeroing that the compiler cannot elide. |
+
+## Integration
+
+`safeheron::secure-buffer` is a static library built from source with your own toolchain; no prebuilt binaries are shipped. On desktop platforms, WebAssembly, Android and iOS it is consumed as an ordinary CMake target. SGX enclaves are the exception: the source file must be compiled with the enclave toolchain, for example as a trusted library via [Safeheron ssgx](https://github.com/Safeheron/ssgx), since a host-built archive cannot be linked into an enclave.
+
+[USAGE.md](USAGE.md) documents the contracts of each type; [PLATFORMS.md](PLATFORMS.md) covers Android, iOS, WebAssembly, Nitro and SGX builds.
+
+### CMake find_package (installed library)
+
+```cmake
+find_package(secure-buffer 1.0.0 REQUIRED)
+target_link_libraries(my_project PRIVATE safeheron::secure-buffer)
+```
+
+### CMake FetchContent
+
+```cmake
+include(FetchContent)
+
+FetchContent_Declare(
+    secure-buffer
+    GIT_REPOSITORY https://github.com/Safeheron/secure-buffer-cpp.git
+    GIT_TAG v1.0.0
+)
+FetchContent_MakeAvailable(secure-buffer)
+
+target_link_libraries(my_project PRIVATE safeheron::secure-buffer)
+```
+
+### Git Submodule
+
+```bash
+git submodule add https://github.com/Safeheron/secure-buffer-cpp.git third_party/secure-buffer
+```
+
+```cmake
+add_subdirectory(third_party/secure-buffer)
+target_link_libraries(my_project PRIVATE safeheron::secure-buffer)
+```
+
+## Building Tests
+
+```bash
+cmake -B build
+cmake --build build --config Debug
+ctest --test-dir build -C Debug --output-on-failure
+```
+
+Requires CMake 3.28+ and a C++17 compiler. `--config` / `-C` select the configuration for multi-config generators (Visual Studio, Xcode) and have no effect otherwise. Google Test (BSD-3-Clause) is fetched at configure time and is never installed.
+
+CI covers Linux (GCC and Clang, libstdc++ and libc++, plus an ASan/UBSan build), macOS (Apple Clang) and Windows (MSVC); see `.github/workflows/ci.yml`.
+
+## Security Notes
+
+Memory is wiped when it is deallocated, on destruction or reallocation; the allocator always wipes the entire block. `clear()`, `pop_back()` and a shrinking `resize()` keep standard-library semantics and do not wipe the removed bytes, which remain in the allocation until it is released. Tie a secret's lifetime to the owning object (RAII).
+
+The absence of `operator<<` is not a confidentiality guarantee. Any code holding `data()`, `view()` or an iterator can read the contents, and generic range formatters and serializers can iterate a `SecureString`. Do not log, format or serialize secrets.
+
+`constant_time_equal` is constant-time in the contents for inputs of equal length. Inputs of different length return immediately; length is treated as public.
+
+Only heap memory managed by `SecureAllocator` is protected. Out of scope:
+
+- Stack variables: wipe them explicitly with `secure_memzero()`.
+- Swap: use `mlock()` / `VirtualLock()` at the application level.
+- Core dumps: use `madvise(MADV_DONTDUMP)` or `prctl(PR_SET_DUMPABLE, 0)` at the application level.
+- CPU registers and caches: requires hardware support.
+
+## License
+
+Copyright 2026 Safeheron Inc. Licensed under the [Apache License 2.0](LICENSE).
