@@ -1,0 +1,10 @@
+build/
+build-*/
+cmake-build-*/
+.idea/
+.vscode/
+*.swp
+*~
+
+# macOS
+.DS_Store
