@@ -62,13 +62,25 @@ public:
     }
 
     /// Throws std::out_of_range if i >= N.
+    // For N == 0 every index is out of range; the branch keeps the return out of
+    // that instantiation, where MSVC would report it as unreachable (C4702).
     T& at(size_type i) {
-        check_index(i);
-        return data_[i];
+        if constexpr (N == 0) {
+            (void)i;
+            throw_out_of_range();
+        } else {
+            if (i >= N) throw_out_of_range();
+            return data_[i];
+        }
     }
     const T& at(size_type i) const {
-        check_index(i);
-        return data_[i];
+        if constexpr (N == 0) {
+            (void)i;
+            throw_out_of_range();
+        } else {
+            if (i >= N) throw_out_of_range();
+            return data_[i];
+        }
     }
 
     /// Precondition: N > 0.
@@ -104,8 +116,8 @@ public:
     const_iterator cend() const noexcept { return data() + N; }
 
 private:
-    static void check_index(size_type i) {
-        if (i >= N) throw std::out_of_range("SecureArray::at: index out of range");
+    [[noreturn]] static void throw_out_of_range() {
+        throw std::out_of_range("SecureArray::at: index out of range");
     }
 
     std::array<T, N> data_{};

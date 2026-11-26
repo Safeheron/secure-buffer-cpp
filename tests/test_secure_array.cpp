@@ -186,9 +186,13 @@ TEST(SecureArrayTest, WiderElementTypes) {
 TEST(SecureArrayTest, ZeroLengthArray) {
     {
         SecureArray<uint8_t, 0> z;
+        const SecureArray<uint8_t, 0>& cz = z;
         secure_cleanse(z);
         EXPECT_TRUE(z.empty());
         EXPECT_EQ(z.begin(), z.end());
+        // Both overloads: for N == 0 they must not contain a statement after the
+        // throw (MSVC /W4 /WX reports it as C4702 in optimized builds).
         EXPECT_THROW(z.at(0), std::out_of_range);
+        EXPECT_THROW(cz.at(0), std::out_of_range);
     }  // destructor runs
 }
