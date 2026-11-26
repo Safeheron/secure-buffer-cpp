@@ -68,7 +68,7 @@ std::string unsafe = to_unsecure_string(bytes);
 ### CMake find_package (installed library)
 
 ```cmake
-find_package(secure-buffer 1.0.0 REQUIRED)
+find_package(secure-buffer 0.9.0 REQUIRED)
 target_link_libraries(my_project PRIVATE safeheron::secure-buffer)
 ```
 
@@ -80,7 +80,7 @@ include(FetchContent)
 FetchContent_Declare(
     secure-buffer
     GIT_REPOSITORY https://github.com/Safeheron/secure-buffer-cpp.git
-    GIT_TAG v1.0.0
+    GIT_TAG v0.9.0
 )
 FetchContent_MakeAvailable(secure-buffer)
 
