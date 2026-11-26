@@ -234,7 +234,7 @@ public:
         size_t old_size = size();
         data_.resize(n + 1);
         if (n > old_size) {
-            std::fill(data_.begin() + old_size, data_.begin() + n,
+            std::fill(data_.data() + old_size, data_.data() + n,
                       static_cast<uint8_t>(c));
         }
         data_[n] = 0;
@@ -315,7 +315,7 @@ public:
         check_grow(n);
         if (data_.empty()) {
             data_.resize(n + 1);     // reuses reserved capacity
-            std::fill(data_.begin(), data_.begin() + n, static_cast<uint8_t>(c));
+            std::fill(data_.data(), data_.data() + n, static_cast<uint8_t>(c));
         } else {
             data_.insert(data_.end() - 1, n, static_cast<uint8_t>(c));  // before the '\0'
         }
@@ -356,13 +356,10 @@ public:
 
     // --- Comparison ---
 
-    /// Length-aware and short-circuit, not constant-time (see
-    /// constant_time_equal). Compare with other types through view().
-    bool operator==(const SecureString& other) const noexcept {
-        return view() == other.view();
-    }
-    // Declared explicitly so that C++17 and C++20 resolve == and != alike.
-    bool operator!=(const SecureString& other) const noexcept { return !(*this == other); }
+    /// Deleted: comparing secrets must not stop at the first differing byte.
+    /// Use constant_time_equal; compare non-secret data through view().
+    bool operator==(const SecureString& other) const = delete;
+    bool operator!=(const SecureString& other) const = delete;
 
     // --- Swap ---
 

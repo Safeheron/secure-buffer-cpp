@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <string>
+#include <secure-buffer/secure_array.h>
 #include <secure-buffer/secure_bytes.h>
 #include <secure-buffer/secure_string.h>
 
@@ -65,6 +66,15 @@ inline SecureString to_secure_string(const std::string& str) {
     if (lhs.size() != rhs.size()) return false;
     if (lhs.empty()) return true;
     return constant_time_equal(lhs.data(), rhs.data(), lhs.size());
+}
+
+/// Compares all N * sizeof(T) bytes in time that depends on N only.
+// The length is part of the type, so there is no length check; for N == 0 the
+// raw overload never dereferences, so a null data() is fine.
+template <typename T, std::size_t N>
+[[nodiscard]] bool constant_time_equal(const SecureArray<T, N>& lhs,
+                                       const SecureArray<T, N>& rhs) noexcept {
+    return constant_time_equal(lhs.data(), rhs.data(), N * sizeof(T));
 }
 
 } // namespace secure_buffer

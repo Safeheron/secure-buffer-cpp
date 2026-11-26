@@ -10,6 +10,7 @@ The library is a foundational component of Safeheron's TEE and cryptography stac
 - Supports Linux (including AWS Nitro Enclaves), macOS, Windows, Android, iOS, SGX and WebAssembly.
 - Header-first API with a minimal compiled core: all platform-specific code is confined to `src/secure_memzero.cpp`, built as a small static library.
 - `SecureAllocator` zeroes every block before deallocating it.
+- Fixed-size secrets: `SecureArray` is wiped on destruction, and `ScopedCleanse` / `secure_cleanse()` wipe existing arrays and integers, and plain-data types you register with `enable_secure_cleanse`.
 
 ## Quick Start
 
@@ -20,6 +21,13 @@ using namespace safeheron::secure_buffer;
 
 // 32 zero-initialized bytes
 auto key = make_secure_bytes<32>();
+
+// Fixed-size secret, zero-initialized and wiped on destruction
+SecureArray<uint8_t, 32> seed;
+
+// Existing stack buffer, wiped when the guard goes out of scope
+uint8_t nonce[32];
+ScopedCleanse guard(nonce);
 
 // Heap-backed string without SSO, so short secrets are wiped as well
 SecureString mnemonic("abandon abandon abandon ... about");
@@ -44,8 +52,10 @@ std::string unsafe = to_unsecure_string(bytes);
 
 | Type | Description |
 |------|-------------|
-| `SecureBytes` | `std::vector<uint8_t, SecureAllocator<uint8_t>>`: the full vector interface, wiped on every deallocation. |
+| `SecureBytes` | `std::vector<uint8_t, SecureAllocator<uint8_t>>`: the vector interface without comparison operators, wiped on every deallocation. |
 | `SecureString` | Length-aware string backed by `SecureBytes`. It has no small-string optimization, whose inline buffer would bypass the allocator. Read-only queries go through `view()`. |
+| `SecureArray<T, N>` | Fixed-size array of integers or `std::byte`, zero-initialized and wiped on destruction. Every copy wipes itself; moves are copies. |
+| `secure_cleanse` / `ScopedCleanse` | Wipe an existing fixed-size object (integer, `std::byte`, a plain-data type registered with `enable_secure_cleanse`, or a `std::array` or built-in array of them) in place, or when a guard leaves scope. `secure_cleanse` also accepts a `SecureArray`; `ScopedCleanse` does not, since `SecureArray` wipes itself. |
 | `SecureAllocator<T>` | Allocator that calls `secure_memzero` before each deallocation. |
 | `secure_memzero` | Portable memory zeroing that the compiler cannot elide. |
 
@@ -106,14 +116,18 @@ Memory is wiped when it is deallocated, on destruction or reallocation; the allo
 
 The absence of `operator<<` is not a confidentiality guarantee. Any code holding `data()`, `view()` or an iterator can read the contents, and generic range formatters and serializers can iterate a `SecureString`. Do not log, format or serialize secrets.
 
+The secure containers have no comparison operators (`a == b` does not compile), so a secret is not compared with a short-circuit operator by accident. This is compile-time misuse prevention, not isolation: an explicit `std::equal` or `memcmp` still compares the bytes. Use `constant_time_equal` for secrets.
+
 `constant_time_equal` is constant-time in the contents for inputs of equal length. Inputs of different length return immediately; length is treated as public.
 
-Only heap memory managed by `SecureAllocator` is protected. Out of scope:
+Only heap memory managed by `SecureAllocator`, `SecureArray` storage, and objects guarded by `ScopedCleanse` or wiped with `secure_cleanse()` are protected. Out of scope:
 
-- Stack variables: wipe them explicitly with `secure_memzero()`.
+- Unguarded stack variables and compiler-generated temporaries.
 - Swap: use `mlock()` / `VirtualLock()` at the application level.
 - Core dumps: use `madvise(MADV_DONTDUMP)` or `prctl(PR_SET_DUMPABLE, 0)` at the application level.
 - CPU registers and caches: requires hardware support.
+
+Wiping a registered plain-data type zeroes its own bytes only; pointer or view members are not followed, so the data they refer to is not wiped.
 
 ## License
 

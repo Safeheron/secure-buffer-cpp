@@ -25,7 +25,9 @@ function(add_secure_buffer_test TEST_NAME TEST_SOURCE)
 endfunction()
 
 add_secure_buffer_test(test_secure_memzero test_secure_memzero.cpp)
+add_secure_buffer_test(test_secure_cleanse test_secure_cleanse.cpp)
 add_secure_buffer_test(test_secure_bytes test_secure_bytes.cpp)
+add_secure_buffer_test(test_secure_array test_secure_array.cpp)
 add_secure_buffer_test(test_secure_string test_secure_string.cpp)
 add_secure_buffer_test(test_secure_utils_compare test_secure_utils_compare.cpp)
 add_secure_buffer_test(test_secure_utils_convert test_secure_utils_convert.cpp)
@@ -33,8 +35,18 @@ add_secure_buffer_test(test_secure_utils_convert test_secure_utils_convert.cpp)
 # Replaces global operator new/delete: needs its own executable
 add_secure_buffer_test(test_secure_allocator_zeroing test_secure_allocator_zeroing.cpp)
 
+# Replaces global operator new/delete: needs its own executable
+add_secure_buffer_test(test_secure_array_zeroing test_secure_array_zeroing.cpp)
+
 # Fault injection through global operator new/delete: needs its own executable
 add_secure_buffer_test(test_secure_string_exception_safety test_secure_string_exception_safety.cpp)
+
+add_secure_buffer_test(test_secure_array_returns test_secure_array_returns.cpp)
+if(NOT MSVC)
+    # Same tests with optional copy elision disabled, so returns take the copy path.
+    add_secure_buffer_test(test_secure_array_returns_no_elide test_secure_array_returns.cpp)
+    target_compile_options(test_secure_array_returns_no_elide PRIVATE -fno-elide-constructors)
+endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     # Optimized GCC builds report false positives in std::vector internals
@@ -65,7 +77,17 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     endif()
     if(SB_EXC_DEMOTE)
         target_compile_options(test_secure_string_exception_safety PRIVATE ${SB_EXC_DEMOTE})
+        target_compile_options(test_secure_array_zeroing PRIVATE ${SB_EXC_DEMOTE})
     endif()
+endif()
+
+# C++20 rewritten comparisons are only checkable where the toolchain supports C++20
+if("cxx_std_20" IN_LIST CMAKE_CXX_COMPILE_FEATURES)
+    add_executable(test_comparison_cxx20 test_comparison_cxx20.cpp)
+    target_link_libraries(test_comparison_cxx20 PRIVATE safeheron::secure-buffer)
+    target_compile_options(test_comparison_cxx20 PRIVATE ${TEST_COMPILE_OPTIONS})
+    set_target_properties(test_comparison_cxx20 PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
+    add_test(NAME test_comparison_cxx20 COMMAND test_comparison_cxx20)
 endif()
 
 # Header-hygiene: no platform macros in public headers
@@ -77,3 +99,6 @@ add_test(
 
 # Header-hygiene: each public header compiles standalone
 add_subdirectory(test_header_selfcontained)
+
+# Compile-fail tests: invalid uses must be rejected with the documented message
+add_subdirectory(compile_fail)

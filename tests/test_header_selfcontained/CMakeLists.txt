@@ -24,14 +24,32 @@ endforeach()
 # libstdc++'s own headers are not written to survive these macros).
 set(minmax_stub "${CMAKE_CURRENT_BINARY_DIR}/header_tolerates_minmax_macros.cpp")
 file(WRITE "${minmax_stub}"
-    "#include <algorithm>\n#include <cassert>\n#include <cstddef>\n#include <cstdint>\n"
+    "#include <algorithm>\n#include <array>\n#include <cassert>\n#include <cstddef>\n#include <cstdint>\n"
     "#include <cstring>\n#include <iterator>\n#include <memory>\n#include <stdexcept>\n"
     "#include <string>\n#include <string_view>\n#include <type_traits>\n#include <vector>\n"
     "#define min(a, b) (((a) < (b)) ? (a) : (b))\n"
     "#define max(a, b) (((a) > (b)) ? (a) : (b))\n"
     "#include <secure-buffer/secure_buffer.h>\n"
-    "int main() { safeheron::secure_buffer::SecureString s(\"ab\"); s.append(s.view()); return static_cast<int>(s.size()) - 4; }\n")
+    "int main() {\n"
+    "  safeheron::secure_buffer::SecureString s(\"ab\"); s.append(s.view());\n"
+    "  unsigned char k[4] = {1, 2, 3, 4}; safeheron::secure_buffer::secure_cleanse(k);\n"
+    "  if (k[0] != 0) return 1;\n"
+    "  safeheron::secure_buffer::SecureArray<unsigned char, 4> a; a[0] = 1;\n"
+    "  safeheron::secure_buffer::secure_cleanse(a);\n"
+    "  if (a[0] != 0) return 1;\n"
+    "  return static_cast<int>(s.size()) - 4;\n"
+    "}\n")
 add_executable(header_tolerates_minmax_macros "${minmax_stub}")
 target_link_libraries(header_tolerates_minmax_macros PRIVATE safeheron::secure-buffer)
 target_compile_options(header_tolerates_minmax_macros PRIVATE ${TEST_COMPILE_OPTIONS})
 add_test(NAME header_tolerates_minmax_macros COMMAND header_tolerates_minmax_macros)
+
+# Downstream code often builds with conversion warnings as errors; keep the public
+# headers clean under them (MSVC's /W4 already covers its narrowing checks).
+if(NOT MSVC)
+    add_executable(header_conversion_clean header_conversion_clean.cpp)
+    target_link_libraries(header_conversion_clean PRIVATE safeheron::secure-buffer)
+    target_compile_options(header_conversion_clean PRIVATE
+        ${TEST_COMPILE_OPTIONS} -Wconversion -Wsign-conversion)
+    add_test(NAME header_conversion_clean COMMAND header_conversion_clean)
+endif()

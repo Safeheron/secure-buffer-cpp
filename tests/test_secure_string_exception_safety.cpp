@@ -76,7 +76,7 @@ TEST(SecureStringExcSafety, PushBackReallocFailPreservesNonEmpty) {
     }
     EXPECT_TRUE(threw);
     EXPECT_EQ(s.size(), 3u);
-    EXPECT_EQ(s, SecureString("abc"));
+    EXPECT_EQ(s.view(), "abc");
     EXPECT_EQ(s.c_str()[3], '\0');
     EXPECT_STREQ(s.c_str(), "abc");
 }
@@ -89,7 +89,7 @@ TEST(SecureStringExcSafety, AppendOwnSliceWithTerminatorGrowthAllocFailPreserves
         try { s.append(s.c_str() + 1, 3); } catch (const std::bad_alloc&) { threw = true; }   // "bc" + its '\0'
     }
     EXPECT_TRUE(threw);
-    EXPECT_EQ(s, SecureString("abc"));   // untouched: the new buffer is built before *this changes
+    EXPECT_EQ(s.view(), "abc");   // untouched: the new buffer is built before *this changes
     EXPECT_STREQ(s.c_str(), "abc");
 }
 
@@ -101,7 +101,7 @@ TEST(SecureStringExcSafety, AppendPtrGrowthAllocFailPreserves) {
         try { s.append("XY", 2); } catch (const std::bad_alloc&) { threw = true; }
     }
     EXPECT_TRUE(threw);
-    EXPECT_EQ(s, SecureString("abc"));   // the new buffer is built first; *this is unchanged and terminated
+    EXPECT_EQ(s.view(), "abc");   // the new buffer is built first; *this is unchanged and terminated
     EXPECT_STREQ(s.c_str(), "abc");
 }
 
@@ -113,7 +113,7 @@ TEST(SecureStringExcSafety, AppendFillReallocFailPreserves) {
         try { s.append(5, 'z'); } catch (const std::bad_alloc&) { threw = true; }
     }
     EXPECT_TRUE(threw);
-    EXPECT_EQ(s, SecureString("abc"));
+    EXPECT_EQ(s.view(), "abc");
     EXPECT_EQ(s.c_str()[3], '\0');
 }
 
@@ -122,14 +122,14 @@ TEST(SecureStringExcSafety, AppendFillReallocFailPreserves) {
 TEST(SecureStringExcSafety, SelfAppendCorrect) {
     SecureString s("abc");
     s += s;
-    EXPECT_EQ(s, SecureString("abcabc"));
+    EXPECT_EQ(s.view(), "abcabc");
     EXPECT_STREQ(s.c_str(), "abcabc");
 }
 
 TEST(SecureStringExcSafety, InternalSliceAppendCorrect) {
     SecureString s("hello");
     s.append(s.c_str() + 1, 3);          // "ell", aliasing an internal slice
-    EXPECT_EQ(s, SecureString("helloell"));
+    EXPECT_EQ(s.view(), "helloell");
 }
 
 TEST(SecureStringExcSafety, EmbeddedNulAppendCorrect) {
@@ -169,7 +169,7 @@ TEST(SecureStringExcSafety, EmptyBranchPreservesReservedCapacity) {
         allocs = g_new_count;
     }
     EXPECT_EQ(allocs, 0u);               // would allocate if it swapped in a temp
-    EXPECT_EQ(s, SecureString("x"));
+    EXPECT_EQ(s.view(), "x");
 }
 
 TEST(SecureStringExcSafety, ClearThenAppendReusesCapacity) {
@@ -182,7 +182,7 @@ TEST(SecureStringExcSafety, ClearThenAppendReusesCapacity) {
         allocs = g_new_count;
     }
     EXPECT_EQ(allocs, 0u);
-    EXPECT_EQ(s, SecureString("y"));
+    EXPECT_EQ(s.view(), "y");
 }
 
 // --- Pointer / view / self appends: allocate only to grow ---
@@ -292,7 +292,7 @@ TEST(SecureStringExcSafety, EmptyPushBackAllocFailStaysEmpty) {
     EXPECT_TRUE(s.empty());              // resize is strong: still a valid empty string
     EXPECT_EQ(s.c_str()[0], '\0');
     s.push_back('x');                    // usable afterwards
-    EXPECT_EQ(s, SecureString("x"));
+    EXPECT_EQ(s.view(), "x");
 }
 
 TEST(SecureStringExcSafety, EmptyAppendGrowthAllocFailStaysEmpty) {
@@ -317,7 +317,7 @@ TEST(SecureStringExcSafety, AppendViewGrowthAllocFailPreserves) {
         try { s += std::string_view("XY"); } catch (const std::bad_alloc&) { threw = true; }
     }
     EXPECT_TRUE(threw);
-    EXPECT_EQ(s, SecureString("abc"));   // the new buffer is built first; *this is unchanged and terminated
+    EXPECT_EQ(s.view(), "abc");   // the new buffer is built first; *this is unchanged and terminated
     EXPECT_STREQ(s.c_str(), "abc");
 }
 
@@ -329,7 +329,7 @@ TEST(SecureStringExcSafety, AppendOwnViewGrowthAllocFailPreserves) {
         try { s.append(s.view()); } catch (const std::bad_alloc&) { threw = true; }
     }
     EXPECT_TRUE(threw);
-    EXPECT_EQ(s, SecureString("abc"));
+    EXPECT_EQ(s.view(), "abc");
     EXPECT_STREQ(s.c_str(), "abc");
 }
 
@@ -352,7 +352,7 @@ TEST(SecureStringExcSafety, AssignCStrSnapshotAllocFailPreserves) {
         try { s = "XYZW"; } catch (const std::bad_alloc&) { threw = true; }
     }
     EXPECT_TRUE(threw);
-    EXPECT_EQ(s, SecureString("abc"));
+    EXPECT_EQ(s.view(), "abc");
     EXPECT_STREQ(s.c_str(), "abc");
 }
 
@@ -364,7 +364,7 @@ TEST(SecureStringExcSafety, SelfAssignSnapshotAllocFailPreserves) {
         try { s = s.c_str() + 2; } catch (const std::bad_alloc&) { threw = true; }
     }
     EXPECT_TRUE(threw);
-    EXPECT_EQ(s, SecureString("secret"));
+    EXPECT_EQ(s.view(), "secret");
 }
 
 // --- reserve(0) must not allocate a block for the terminator alone ---

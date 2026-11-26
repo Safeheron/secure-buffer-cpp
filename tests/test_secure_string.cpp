@@ -14,6 +14,27 @@
 
 using namespace safeheron::secure_buffer;
 
+namespace {
+
+// Detection traits: true only if `lhs OP rhs` is a well-formed expression
+// (a deleted function selected by overload resolution counts as ill-formed).
+template <class T, class U, class = void> struct has_equal_with : std::false_type {};
+template <class T, class U>
+struct has_equal_with<T, U, std::void_t<decltype(std::declval<const T&>() == std::declval<const U&>())>>
+    : std::true_type {};
+
+template <class T, class = void> struct has_equal : std::false_type {};
+template <class T>
+struct has_equal<T, std::void_t<decltype(std::declval<const T&>() == std::declval<const T&>())>>
+    : std::true_type {};
+
+template <class T, class = void> struct has_not_equal : std::false_type {};
+template <class T>
+struct has_not_equal<T, std::void_t<decltype(std::declval<const T&>() != std::declval<const T&>())>>
+    : std::true_type {};
+
+} // namespace
+
 // --- Construction ---
 
 TEST(SecureStringTest, DefaultConstruction) {
@@ -50,7 +71,7 @@ TEST(SecureStringTest, ConstructFromRuntimeNullThrows) {
 TEST(SecureStringTest, CopyConstruction) {
     SecureString a("secret");
     SecureString b(a);
-    EXPECT_EQ(a, b);
+    EXPECT_EQ(a.view(), b.view());
     EXPECT_STREQ(b.c_str(), "secret");
 }
 
@@ -67,7 +88,7 @@ TEST(SecureStringTest, CopyAssignment) {
     SecureString a("hello");
     SecureString b;
     b = a;
-    EXPECT_EQ(a, b);
+    EXPECT_EQ(a.view(), b.view());
 }
 
 TEST(SecureStringTest, MoveAssignment) {
@@ -215,14 +236,14 @@ TEST(SecureStringTest, NonConstIteratorModify) {
 
 // --- Comparison ---
 
-TEST(SecureStringTest, EqualitySecureString) {
+TEST(SecureStringTest, ViewEquality) {
     SecureString a("hello");
     SecureString b("hello");
     SecureString c("world");
-    EXPECT_TRUE(a == b);
-    EXPECT_FALSE(a == c);
-    EXPECT_FALSE(a != b);
-    EXPECT_TRUE(a != c);
+    EXPECT_TRUE(a.view() == b.view());
+    EXPECT_FALSE(a.view() == c.view());
+    EXPECT_FALSE(a.view() != b.view());
+    EXPECT_TRUE(a.view() != c.view());
 }
 
 TEST(SecureStringTest, EqualityWithLiteralsGoesThroughView) {
@@ -237,7 +258,7 @@ TEST(SecureStringTest, EqualityWithLiteralsGoesThroughView) {
 TEST(SecureStringTest, EqualityEmpty) {
     SecureString a;
     SecureString b;
-    EXPECT_TRUE(a == b);
+    EXPECT_TRUE(a.view() == b.view());
     EXPECT_TRUE(a.view() == "");
     EXPECT_TRUE(a.view().empty());
 }
@@ -378,7 +399,7 @@ TEST(SecureStringEmptyState, NonConstDataOnEmptyIsWritable) {
 TEST(SecureStringEmptyState, MovedFromIsValidEmpty) {
     SecureString a("abc");
     SecureString b(std::move(a));
-    EXPECT_EQ(b, SecureString("abc"));
+    EXPECT_EQ(b.view(), "abc");
     EXPECT_NE(a.data(), nullptr);     // moved-from is a valid (empty) string
     EXPECT_TRUE(a.empty());
 }
@@ -386,12 +407,12 @@ TEST(SecureStringEmptyState, MovedFromIsValidEmpty) {
 TEST(SecureStringEmptyState, GrowFromEmptyThenTrimBackToEmpty) {
     SecureString s;
     s.push_back('x');
-    EXPECT_EQ(s, SecureString("x"));
+    EXPECT_EQ(s.view(), "x");
     s.pop_back();
     EXPECT_TRUE(s.empty());
     EXPECT_EQ(s.c_str()[0], '\0');
     s.append("hello");
-    EXPECT_EQ(s, SecureString("hello"));
+    EXPECT_EQ(s.view(), "hello");
 }
 
 // --- (const char*, size_t) null contract ---
@@ -468,10 +489,10 @@ static_assert(!can_assign_braces<SecureString>::value, "s = {} must not compile 
 static_assert(!can_append_zero<SecureString>::value, "s.append(0) must not compile (ambiguous)");
 static_assert(!can_pluseq_zero<SecureString>::value, "s += 0 must not compile (ambiguous)");
 
-// Cross-type equality is deliberately absent: compare through view() instead.
+// Equality is deliberately absent, also across types: compare through view() instead.
 template <class T, class U, class = void> struct can_equal : std::false_type {};
 template <class T, class U> struct can_equal<T, U, std::void_t<decltype(std::declval<const T&>() == std::declval<const U&>())>> : std::true_type {};
-static_assert(can_equal<SecureString, SecureString>::value, "SecureString == SecureString must compile");
+static_assert(!can_equal<SecureString, SecureString>::value, "SecureString == SecureString must not compile");
 static_assert(!can_equal<SecureString, const char*>::value, "s == \"x\" must not compile");
 static_assert(!can_equal<const char*, SecureString>::value, "\"x\" == s must not compile");
 static_assert(!can_equal<SecureString, std::string>::value, "s == std::string must not compile");
@@ -488,7 +509,7 @@ static_assert(!can_construct_from_zero<SecureString>::value, "SecureString(0) mu
 TEST(SecureStringOverflow, ResizeSizeMaxThrowsPreservesNonEmpty) {
     SecureString s("abc");
     EXPECT_THROW(s.resize(SIZE_MAX), std::length_error);
-    EXPECT_EQ(s, SecureString("abc"));      // content unchanged
+    EXPECT_EQ(s.view(), "abc");      // content unchanged
     EXPECT_EQ(s.size(), 3u);                // length unchanged
     EXPECT_EQ(s.c_str()[3], '\0');          // terminator intact
 }
@@ -496,20 +517,20 @@ TEST(SecureStringOverflow, ResizeSizeMaxThrowsPreservesNonEmpty) {
 TEST(SecureStringOverflow, ResizeMaxSizePlusOneThrows) {
     SecureString s("abc");
     EXPECT_THROW(s.resize(s.max_size() + 1), std::length_error);
-    EXPECT_EQ(s, SecureString("abc"));
+    EXPECT_EQ(s.view(), "abc");
 }
 
 TEST(SecureStringOverflow, ResizeFillSizeMaxThrowsPreserves) {
     SecureString s("abc");
     EXPECT_THROW(s.resize(SIZE_MAX, 'x'), std::length_error);
-    EXPECT_EQ(s, SecureString("abc"));
+    EXPECT_EQ(s.view(), "abc");
     EXPECT_EQ(s.c_str()[3], '\0');
 }
 
 TEST(SecureStringOverflow, ReserveSizeMaxThrowsPreserves) {
     SecureString s("abc");
     EXPECT_THROW(s.reserve(SIZE_MAX), std::length_error);
-    EXPECT_EQ(s, SecureString("abc"));
+    EXPECT_EQ(s.view(), "abc");
 }
 
 TEST(SecureStringOverflow, ResizeSizeMaxOnEmptyStaysEmpty) {
@@ -522,7 +543,7 @@ TEST(SecureStringOverflow, ResizeSizeMaxOnEmptyStaysEmpty) {
 TEST(SecureStringOverflow, AppendFillSizeMaxThrowsPreserves) {
     SecureString s("secret");
     EXPECT_THROW(s.append(SIZE_MAX, 'x'), std::length_error);
-    EXPECT_EQ(s, SecureString("secret"));
+    EXPECT_EQ(s.view(), "secret");
     EXPECT_EQ(s.size(), 6u);
     EXPECT_EQ(s.c_str()[6], '\0');
 }
@@ -530,7 +551,7 @@ TEST(SecureStringOverflow, AppendFillSizeMaxThrowsPreserves) {
 TEST(SecureStringOverflow, AppendPtrHugeLenThrowsBeforePointerArith) {
     SecureString s("secret");
     EXPECT_THROW(s.append("x", SIZE_MAX), std::length_error);   // check runs before "x" + SIZE_MAX
-    EXPECT_EQ(s, SecureString("secret"));
+    EXPECT_EQ(s.view(), "secret");
     EXPECT_EQ(s.c_str()[6], '\0');
 }
 
@@ -565,13 +586,14 @@ TEST(SecureStringEmbeddedNul, ConstructPreservesEmbeddedNul) {
     EXPECT_EQ(std::strlen(s.c_str()), 3u);      // C view sees only "abc"
 }
 
-TEST(SecureStringEmbeddedNul, EqualitySecureStringLengthAware) {
+TEST(SecureStringEmbeddedNul, ViewEqualityIsLengthAware) {
     SecureString a("abc\0def", 7);
     SecureString b("abc\0def", 7);
     SecureString c("abc\0xyz", 7);
-    EXPECT_TRUE(a == b);
-    EXPECT_FALSE(a == c);                        // differ after the NUL
-    EXPECT_FALSE(a == SecureString("abc"));      // 7 bytes != 3 bytes
+    EXPECT_TRUE(a.view() == b.view());
+    EXPECT_FALSE(a.view() == c.view());                        // differ after the NUL
+    SecureString d("abc");
+    EXPECT_FALSE(a.view() == d.view());                        // 7 bytes != 3 bytes
 }
 
 TEST(SecureStringEmbeddedNul, EqualityWithLiteralIsLengthAware) {
@@ -601,7 +623,8 @@ TEST(SecureStringEmbeddedNul, MultipleNuls) {
     EXPECT_EQ(s[0], '\0');
     EXPECT_EQ(s[4], '\0');
     EXPECT_EQ(s.c_str()[5], '\0');
-    EXPECT_TRUE(s == SecureString("\0a\0b\0", 5));
+    SecureString expected("\0a\0b\0", 5);
+    EXPECT_TRUE(s.view() == expected.view());
 }
 
 TEST(SecureStringEmbeddedNul, MutableWriteOfNulKeepsObjectValid) {
@@ -609,7 +632,8 @@ TEST(SecureStringEmbeddedNul, MutableWriteOfNulKeepsObjectValid) {
     s[1] = '\0';                                 // embedded NUL is allowed content
     EXPECT_EQ(s.size(), 3u);                     // length unchanged
     EXPECT_EQ(s.c_str()[3], '\0');               // trailing terminator intact
-    EXPECT_TRUE(s == SecureString("a\0c", 3));
+    SecureString expected("a\0c", 3);
+    EXPECT_TRUE(s.view() == expected.view());
     EXPECT_FALSE(s.view() == "a");                // length-aware: 3 bytes != 1
 }
 
@@ -617,7 +641,8 @@ TEST(SecureStringEmbeddedNul, EmptyUnaffected) {
     SecureString s;
     EXPECT_EQ(s.view().find('\0'), std::string_view::npos);
     EXPECT_TRUE(s.view() == "");
-    EXPECT_TRUE(s == SecureString());
+    SecureString other;
+    EXPECT_TRUE(s.view() == other.view());
 }
 
 // --- operator=(const char*) is safe when the source aliases the target ---
@@ -625,20 +650,20 @@ TEST(SecureStringEmbeddedNul, EmptyUnaffected) {
 TEST(SecureStringSelfAssign, AssignFromOwnCStr) {
     SecureString s("secret");
     s = s.c_str();                       // self-assign via own buffer
-    EXPECT_EQ(s, SecureString("secret")); // content survives the aliasing source
+    EXPECT_EQ(s.view(), "secret"); // content survives the aliasing source
     EXPECT_STREQ(s.c_str(), "secret");
 }
 
 TEST(SecureStringSelfAssign, AssignFromOwnDataSlice) {
     SecureString s("hello");
     s = s.c_str() + 2;                   // internal slice "llo"
-    EXPECT_EQ(s, SecureString("llo"));
+    EXPECT_EQ(s.view(), "llo");
 }
 
 TEST(SecureStringSelfAssign, NormalAssign) {
     SecureString s("old");
     s = "new value";
-    EXPECT_EQ(s, SecureString("new value"));
+    EXPECT_EQ(s.view(), "new value");
     s = "";
     EXPECT_TRUE(s.empty());
 }
@@ -668,7 +693,7 @@ TEST(SecureStringCoverage, ReserveThenBuildWithinCapacity) {
     s.append("0123456789");                   // must be correct within reserved space
     s.push_back('x');
     EXPECT_EQ(s.size(), 11u);
-    EXPECT_EQ(s, SecureString("0123456789x"));
+    EXPECT_EQ(s.view(), "0123456789x");
 }
 
 // --- view(): the single read-only interface ---
@@ -965,8 +990,8 @@ static_assert(noexcept(std::declval<SecureString&>().rbegin()) && noexcept(std::
 static_assert(noexcept(std::declval<SecureString&>().clear()), "");
 static_assert(noexcept(std::declval<SecureString&>().pop_back()), "");
 static_assert(noexcept(std::declval<SecureString&>().swap(std::declval<SecureString&>())), "");
-static_assert(noexcept(std::declval<const SecureString&>() == std::declval<const SecureString&>()), "");
-static_assert(noexcept(std::declval<const SecureString&>() != std::declval<const SecureString&>()), "");
+static_assert(!has_equal<SecureString>::value && !has_not_equal<SecureString>::value, "");
+static_assert(!has_equal_with<SecureString, const char*>::value, "");
 // Narrow-contract, throwing or allocating members are not noexcept.
 static_assert(!noexcept(std::declval<const SecureString&>()[0]), "operator[] has a narrow contract");
 static_assert(!noexcept(std::declval<const SecureString&>().at(0)), "at() throws");

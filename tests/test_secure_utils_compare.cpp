@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
+#include <secure-buffer/secure_array.h>
 #include <secure-buffer/secure_utils.h>
 #include <cstdint>
+#include <utility>
 
 using namespace safeheron::secure_buffer;
 
@@ -113,4 +115,40 @@ TEST(ConstantTimeEqualRawTest, MultipleDifferencesAccumulateOver32Bytes) {
     EXPECT_FALSE(constant_time_equal(a, b, 32));
     b[0] ^= 0x01; b[31] ^= 0xFF;                   // only the middle diff remains
     EXPECT_FALSE(constant_time_equal(a, b, 32));
+}
+
+// --- constant_time_equal(SecureArray, SecureArray) ---
+
+static_assert(noexcept(constant_time_equal(std::declval<const SecureArray<uint8_t, 32>&>(),
+                                           std::declval<const SecureArray<uint8_t, 32>&>())),
+              "the SecureArray overload is noexcept");
+
+TEST(ConstantTimeEqualSecureArrayTest, Equal) {
+    SecureArray<uint8_t, 32> a;
+    SecureArray<uint8_t, 32> b;
+    for (size_t i = 0; i < 32; ++i) a[i] = b[i] = 0x5A;
+    EXPECT_TRUE(constant_time_equal(a, b));
+}
+
+TEST(ConstantTimeEqualSecureArrayTest, DifferentLastByte) {
+    SecureArray<uint8_t, 32> a;
+    SecureArray<uint8_t, 32> b;
+    for (size_t i = 0; i < 32; ++i) a[i] = b[i] = 0x5A;
+    b[31] ^= 0x01;
+    EXPECT_FALSE(constant_time_equal(a, b));
+}
+
+TEST(ConstantTimeEqualSecureArrayTest, WiderElementsCompareAllBytes) {
+    SecureArray<uint32_t, 4> a;
+    SecureArray<uint32_t, 4> b;
+    for (size_t i = 0; i < 4; ++i) a[i] = b[i] = 0x11223344u + static_cast<uint32_t>(i);
+    EXPECT_TRUE(constant_time_equal(a, b));
+    b[3] = a[3] ^ 0x01000000u;   // differs only in the most significant byte of the last element
+    EXPECT_FALSE(constant_time_equal(a, b));
+}
+
+TEST(ConstantTimeEqualSecureArrayTest, ZeroLength) {
+    SecureArray<uint8_t, 0> a;
+    SecureArray<uint8_t, 0> b;
+    EXPECT_TRUE(constant_time_equal(a, b));
 }

@@ -1,7 +1,80 @@
 #include <gtest/gtest.h>
 #include <secure-buffer/secure_bytes.h>
+#include <secure-buffer/secure_utils.h>
+#include <algorithm>
+#include <cstdint>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 using namespace safeheron::secure_buffer;
+
+namespace {
+
+// Detection traits: true only if `lhs OP rhs` is a well-formed expression
+// (a deleted function selected by overload resolution counts as ill-formed).
+template <class T, class U, class = void> struct has_equal_with : std::false_type {};
+template <class T, class U>
+struct has_equal_with<T, U, std::void_t<decltype(std::declval<const T&>() == std::declval<const U&>())>>
+    : std::true_type {};
+
+template <class T, class = void> struct has_equal : std::false_type {};
+template <class T>
+struct has_equal<T, std::void_t<decltype(std::declval<const T&>() == std::declval<const T&>())>>
+    : std::true_type {};
+
+template <class T, class = void> struct has_not_equal : std::false_type {};
+template <class T>
+struct has_not_equal<T, std::void_t<decltype(std::declval<const T&>() != std::declval<const T&>())>>
+    : std::true_type {};
+
+template <class T, class = void> struct has_less : std::false_type {};
+template <class T>
+struct has_less<T, std::void_t<decltype(std::declval<const T&>() < std::declval<const T&>())>>
+    : std::true_type {};
+
+template <class T, class = void> struct has_greater : std::false_type {};
+template <class T>
+struct has_greater<T, std::void_t<decltype(std::declval<const T&>() > std::declval<const T&>())>>
+    : std::true_type {};
+
+template <class T, class = void> struct has_less_equal : std::false_type {};
+template <class T>
+struct has_less_equal<T, std::void_t<decltype(std::declval<const T&>() <= std::declval<const T&>())>>
+    : std::true_type {};
+
+template <class T, class = void> struct has_greater_equal : std::false_type {};
+template <class T>
+struct has_greater_equal<T, std::void_t<decltype(std::declval<const T&>() >= std::declval<const T&>())>>
+    : std::true_type {};
+
+bool same_bytes(const SecureBytes& a, const SecureBytes& b) {
+    return std::equal(a.begin(), a.end(), b.begin(), b.end());
+}
+
+} // namespace
+
+// --- No comparison operators ---
+
+static_assert(!has_equal<SecureBytes>::value && !has_not_equal<SecureBytes>::value &&
+              !has_less<SecureBytes>::value && !has_greater<SecureBytes>::value &&
+              !has_less_equal<SecureBytes>::value && !has_greater_equal<SecureBytes>::value,
+              "SecureBytes has no comparison operators");
+static_assert(!has_equal_with<SecureBytes, std::vector<uint8_t>>::value,
+              "SecureBytes cannot be compared with a plain vector either");
+static_assert(has_equal<std::vector<uint8_t>>::value && has_less<std::vector<uint8_t>>::value,
+              "plain std::vector<uint8_t> comparisons are unaffected");
+
+TEST(SecureBytesTest, NonSecretComparisonPaths) {
+    SecureBytes a(16, 0xAB);
+    SecureBytes b(16, 0xAB);
+    SecureBytes c(16, 0xAB);
+    c[15] = 0xAC;
+    EXPECT_TRUE(std::equal(a.begin(), a.end(), b.begin(), b.end()));
+    EXPECT_FALSE(std::equal(a.begin(), a.end(), c.begin(), c.end()));
+    EXPECT_TRUE(constant_time_equal(a, b));
+    EXPECT_FALSE(constant_time_equal(a, c));
+}
 
 // --- SecureBytes basic ---
 
@@ -20,10 +93,10 @@ TEST(SecureBytesTest, SizedConstruction) {
 TEST(SecureBytesTest, CopyAndMove) {
     SecureBytes a(16, 0xAB);
     SecureBytes b = a;
-    EXPECT_EQ(a, b);
+    EXPECT_TRUE(same_bytes(a, b));
 
     SecureBytes c = std::move(b);
-    EXPECT_EQ(c, a);
+    EXPECT_TRUE(same_bytes(c, a));
     EXPECT_TRUE(b.empty());
 }
 
@@ -57,7 +130,7 @@ TEST(MakeSecureBytesTest, ZeroSize) {
 
 TEST(SecureBytesTest, InsertEraseShrinkToFit) {
     SecureBytes buf = {0x01, 0x02, 0x04};
-    buf.insert(buf.begin() + 2, 0x03);                   // full vector interface
+    buf.insert(buf.begin() + 2, 0x03);                   // vector interface
     ASSERT_EQ(buf.size(), 4u);
     EXPECT_EQ(buf[2], 0x03);
     buf.erase(buf.begin());
@@ -65,7 +138,7 @@ TEST(SecureBytesTest, InsertEraseShrinkToFit) {
     EXPECT_EQ(buf[0], 0x02);
     buf.reserve(64);
     buf.shrink_to_fit();                                 // realloc path (old buffer wiped by allocator)
-    EXPECT_EQ(buf, (SecureBytes{0x02, 0x03, 0x04}));
+    EXPECT_TRUE(same_bytes(buf, SecureBytes{0x02, 0x03, 0x04}));
 }
 
 TEST(SecureAllocatorTest, AllocateReturnsUsablePointer) {
