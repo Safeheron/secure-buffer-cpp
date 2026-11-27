@@ -13,7 +13,7 @@ foreach(hdr ${PUBLIC_HEADERS})
         "#include <${hdr}>\n#include <${hdr}>\nint main() { return 0; }\n")
     add_executable(selfcontained_${stub_id} "${stub}")
     target_link_libraries(selfcontained_${stub_id} PRIVATE safeheron::secure-buffer)
-    target_compile_options(selfcontained_${stub_id} PRIVATE ${TEST_COMPILE_OPTIONS})
+    secure_buffer_test_options(selfcontained_${stub_id})
     add_test(NAME selfcontained_${stub_id} COMMAND selfcontained_${stub_id})
 endforeach()
 
@@ -46,15 +46,17 @@ file(WRITE "${minmax_stub}"
     "}\n")
 add_executable(header_tolerates_minmax_macros "${minmax_stub}")
 target_link_libraries(header_tolerates_minmax_macros PRIVATE safeheron::secure-buffer)
-target_compile_options(header_tolerates_minmax_macros PRIVATE ${TEST_COMPILE_OPTIONS})
+secure_buffer_test_options(header_tolerates_minmax_macros)
 add_test(NAME header_tolerates_minmax_macros COMMAND header_tolerates_minmax_macros)
 
 # Downstream code often builds with conversion warnings as errors; keep the public
 # headers clean under them (MSVC's /W4 already covers its narrowing checks).
+# The check is that this compiles without a warning, so it keeps -Werror even
+# when warnings-as-errors is turned off.
 if(NOT MSVC)
     add_executable(header_conversion_clean header_conversion_clean.cpp)
     target_link_libraries(header_conversion_clean PRIVATE safeheron::secure-buffer)
-    target_compile_options(header_conversion_clean PRIVATE
-        ${TEST_COMPILE_OPTIONS} -Wconversion -Wsign-conversion)
+    secure_buffer_test_options(header_conversion_clean)
+    target_compile_options(header_conversion_clean PRIVATE -Werror -Wconversion -Wsign-conversion)
     add_test(NAME header_conversion_clean COMMAND header_conversion_clean)
 endif()

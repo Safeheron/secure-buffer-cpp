@@ -82,3 +82,24 @@ jobs:
         env:
           UBSAN_OPTIONS: print_stacktrace=1
         run: ctest --test-dir build -C ${{ matrix.config }} --output-on-failure
+
+  # Installation without the tests, use through find_package and
+  # add_subdirectory (with and without the tests), and settings passed in from
+  # outside taking effect; see tests/integration/run.sh.
+  integration:
+    name: 'Linux x86_64 / GCC / integration'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Ninja
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build
+
+      - name: Integration checks
+        env:
+          CC: gcc
+          CXX: g++
+        run: tests/integration/run.sh
