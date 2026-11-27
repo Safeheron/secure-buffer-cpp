@@ -26,6 +26,13 @@ for tool in cmake ctest ninja python3 nm; do
     fi
 done
 
+# The version from version.h; a downstream project requests the minor version.
+if ! VERSION=$(cmake -P "$ROOT/cmake/version.cmake"); then
+    echo "run.sh: cannot read the version from version.h" >&2
+    exit 2
+fi
+FIND_VERSION=${VERSION%.*}
+
 MARKER=.secure-buffer-integration-work
 if [[ -e $WORK || -L $WORK ]]; then
     if [[ ! -d $WORK || -L $WORK ]] || { [[ -n $(ls -A "$WORK") ]] && [[ ! -e $WORK/$MARKER ]]; }; then
@@ -193,13 +200,14 @@ s1_install() {
     check "s1: secure_memzero.cpp has no -Werror" flags "$b" secure_memzero.cpp reject -Werror
     check "s1: secure_memzero.cpp has -std=c++17" flags "$b" secure_memzero.cpp want -std=c++17
     check "s1: libsecure-buffer.a is installed" file_under "$WORK/prefix" libsecure-buffer.a
+    check "s1: version.h is installed" file_under "$WORK/prefix" version.h
     check "s1: nothing of GoogleTest is installed" no_path_matches "$WORK/prefix" '*gtest*' '*gmock*'
 }
 
 s2_package_consumer() {
     local b="$WORK/package-consumer"
     run cmake -S "$CONSUMER" -B "$b" -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-        -DCMAKE_BUILD_TYPE=Release -DSB_CONSUMER_MODE=package \
+        -DCMAKE_BUILD_TYPE=Release -DSB_CONSUMER_MODE=package -DSB_FIND_VERSION="$FIND_VERSION" \
         -DCMAKE_PREFIX_PATH="$WORK/prefix" || return 1
     run cmake --build "$b" || return 1
     check "s2: consumer tests pass" ctest --test-dir "$b" --output-on-failure

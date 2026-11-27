@@ -1,0 +1,21 @@
+name: Version check
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  tag-matches-version:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: The tag must be v followed by the version in version.h
+        run: |
+          expected="v$(cmake -P cmake/version.cmake)"
+          if [ "$GITHUB_REF_NAME" != "$expected" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match the version in version.h ($expected)"
+            exit 1
+          fi

@@ -52,6 +52,13 @@ add_secure_buffer_test(test_secure_string test_secure_string.cpp)
 add_secure_buffer_test(test_secure_utils_compare test_secure_utils_compare.cpp)
 add_secure_buffer_test(test_secure_utils_convert test_secure_utils_convert.cpp)
 add_secure_buffer_test(test_compat_span test_compat_span.cpp)
+# The version as CMake read it from version.h, to compare with the preprocessor's reading.
+add_secure_buffer_test(test_version test_version.cpp)
+target_compile_definitions(test_version PRIVATE
+    SECURE_BUFFER_EXPECTED_VERSION="${PROJECT_VERSION}"
+    SECURE_BUFFER_EXPECTED_MAJOR=${PROJECT_VERSION_MAJOR}
+    SECURE_BUFFER_EXPECTED_MINOR=${PROJECT_VERSION_MINOR}
+    SECURE_BUFFER_EXPECTED_PATCH=${PROJECT_VERSION_PATCH})
 # C++20-only targets: test_compat_span_std builds the span tests against
 # std::span (sbuf::span must be a strict subset of it); test_comparison_cxx20
 # and the *_cxx20 compile-fail cases (tests/compile_fail) pin the rewritten
@@ -165,6 +172,19 @@ add_test(
     COMMAND ${CMAKE_COMMAND} -DPROJECT_SOURCE_DIR=${PROJECT_SOURCE_DIR}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/test_no_platform_macros.cmake
 )
+
+# cmake/version.cmake, which CMakeLists.txt and the release tag check read the version through,
+# on headers it must accept and reject.
+add_test(NAME version_header_parse
+    COMMAND ${CMAKE_COMMAND} -DROOT=${PROJECT_SOURCE_DIR}
+            -DWORK=${CMAKE_CURRENT_BINARY_DIR}/version-header-parse
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/version_header/parse_test.cmake)
+
+# The version numbers the documents give (find_package(secure-buffer X.Y), GIT_TAG vX.Y.Z)
+# match version.h.
+add_test(NAME version_docs
+    COMMAND ${CMAKE_COMMAND} -DROOT=${PROJECT_SOURCE_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/version_header/docs_test.cmake)
 
 # Header-hygiene: each public header compiles standalone
 add_subdirectory(test_header_selfcontained)

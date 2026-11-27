@@ -1,8 +1,10 @@
 # Platform Integration
 
-The library is one set of portable headers plus a single compiled source file
-(`src/secure_memzero.cpp`), built from source with your own toolchain. The only
-question per platform is: **which toolchain compiles that one file.**
+The library is one set of portable headers plus two compiled source files,
+built from source with your own toolchain: `src/secure_memzero.cpp`, which holds
+all platform-specific code, and `src/version.cpp`, which only provides
+`version()`. The only question per platform is: **which toolchain compiles
+those two files.**
 
 On most platforms the answer is your own toolchain via this repo's CMake:
 configure with the platform's toolchain file, if any, and link one target:
@@ -60,11 +62,15 @@ linking is recommended for a minimal rootfs) and package with
 ## SGX enclave
 
 SGX is the exception, since an enclave cannot link a host-built archive. Recompile
-`src/secure_memzero.cpp` with the enclave toolchain and expose the public
-headers to the enclave target. With [Safeheron ssgx](https://github.com/Safeheron/ssgx):
+`src/secure_memzero.cpp` and `src/version.cpp` with the enclave toolchain and
+expose the public headers to the enclave target. An enclave that never calls
+`safeheron::sbuf::version()` may compile `src/secure_memzero.cpp` alone. With
+[Safeheron ssgx](https://github.com/Safeheron/ssgx):
 
 ```cmake
-ssgx_add_trusted_library(secure_buffer_t SRCS ${secure_buffer_dir}/src/secure_memzero.cpp)
+ssgx_add_trusted_library(secure_buffer_t SRCS
+    ${secure_buffer_dir}/src/secure_memzero.cpp
+    ${secure_buffer_dir}/src/version.cpp)
 target_include_directories(secure_buffer_t PUBLIC ${secure_buffer_dir}/include)
 
 ssgx_add_enclave_library(my_enclave SRCS enclave.cpp

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.28)
+# The version is written in include/secure-buffer/version.h only; this sets SECURE_BUFFER_VERSION from it.
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.cmake)
 project(secure-buffer
-    VERSION 0.11.0
+    VERSION ${SECURE_BUFFER_VERSION}
     LANGUAGES CXX
     DESCRIPTION "C++17 secure-buffer base library (header-first API + tiny compiled core)"
 )
@@ -14,7 +16,7 @@ option(SECURE_BUFFER_BUILD_TESTS "Build the tests (downloads GoogleTest)" ${PROJ
 # custom -DCMAKE_INSTALL_INCLUDEDIR breaks the exported package.
 include(GNUInstallDirs)
 
-add_library(secure-buffer STATIC src/secure_memzero.cpp)
+add_library(secure-buffer STATIC src/secure_memzero.cpp src/version.cpp)
 add_library(safeheron::secure-buffer ALIAS secure-buffer)
 
 # A value set by the user, a toolchain file or a parent project wins;
