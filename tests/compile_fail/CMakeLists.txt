@@ -1,15 +1,17 @@
 # Compile-fail tests: each source must be rejected by a specific static_assert.
 # The test runs a nested build of an EXCLUDE_FROM_ALL target and passes only if
 # the build output matches MESSAGE_REGEX (the exit code is ignored, so an
-# unrelated compile error does not pass). Nested builds of one tree share a
-# lock because they must not run in parallel.
+# unrelated compile error does not pass). The nested build runs in the
+# top-level build tree: when this project is a subproject, its own binary
+# directory is not a build tree, and target names are global anyway. Nested
+# builds of one tree share a lock because they must not run in parallel.
 function(add_compile_fail_test NAME SOURCE MESSAGE_REGEX)
     add_executable(${NAME} EXCLUDE_FROM_ALL ${SOURCE})
     target_link_libraries(${NAME} PRIVATE safeheron::secure-buffer)
-    target_compile_options(${NAME} PRIVATE ${TEST_COMPILE_OPTIONS})
+    secure_buffer_test_options(${NAME})
     add_test(
         NAME compile_fail_${NAME}
-        COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR}
+        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}
                 --target ${NAME} --config $<CONFIG>
     )
     set_tests_properties(compile_fail_${NAME} PROPERTIES

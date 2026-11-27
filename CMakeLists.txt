@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.28)
 project(secure-buffer
-    VERSION 0.10.0
+    VERSION 0.10.1
     LANGUAGES CXX
     DESCRIPTION "C++17 secure-buffer base library (header-first API + tiny compiled core)"
 )
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+# Defaults to ON only when this is the top-level project. With it OFF,
+# GoogleTest is not downloaded, built or installed.
+option(SECURE_BUFFER_BUILD_TESTS "Build the tests (downloads GoogleTest)" ${PROJECT_IS_TOP_LEVEL})
 
 # GNUInstallDirs must precede the target: CMAKE_INSTALL_INCLUDEDIR is used in
 # its INSTALL_INTERFACE and must match install(DIRECTORY ...) below, or a
@@ -17,20 +17,36 @@ include(GNUInstallDirs)
 add_library(secure-buffer STATIC src/secure_memzero.cpp)
 add_library(safeheron::secure-buffer ALIAS secure-buffer)
 
+# A value set by the user, a toolchain file or a parent project wins;
+# otherwise the library's default. Only this target is affected.
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+    set_target_properties(secure-buffer PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+endif()
+if(NOT DEFINED CMAKE_CXX_EXTENSIONS)
+    set_target_properties(secure-buffer PROPERTIES CXX_EXTENSIONS OFF)
+endif()
+if(NOT DEFINED CMAKE_POSITION_INDEPENDENT_CODE)
+    set_target_properties(secure-buffer PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
+# The library has no C++20 modules. Scanning its source for them (done for
+# C++20 under Ninja) would need a tool such as clang-scan-deps, which a parent
+# project building in C++20 may not have.
+if(NOT DEFINED CMAKE_CXX_SCAN_FOR_MODULES)
+    set_target_properties(secure-buffer PROPERTIES CXX_SCAN_FOR_MODULES OFF)
+endif()
+# Warnings are errors only in a build with the tests (development and CI), so
+# a build that installs or embeds the library does not fail when a newer
+# compiler adds a warning. CMAKE_COMPILE_WARNING_AS_ERROR and
+# cmake --compile-no-warning-as-error override it.
+if(NOT DEFINED CMAKE_COMPILE_WARNING_AS_ERROR)
+    set_target_properties(secure-buffer PROPERTIES COMPILE_WARNING_AS_ERROR ${SECURE_BUFFER_BUILD_TESTS})
+endif()
+
 # Warnings on the library itself (PRIVATE: never propagated to consumers).
-# -Werror only when built top-level: this library is source-distributed
-# (FetchContent/subdirectory), and an unconditional -Werror would break
-# downstream builds whenever a future compiler adds a new warning.
 if(MSVC)
     target_compile_options(secure-buffer PRIVATE /W4)
-    if(PROJECT_IS_TOP_LEVEL)
-        target_compile_options(secure-buffer PRIVATE /WX)
-    endif()
 else()
     target_compile_options(secure-buffer PRIVATE -Wall -Wextra)
-    if(PROJECT_IS_TOP_LEVEL)
-        target_compile_options(secure-buffer PRIVATE -Werror)
-    endif()
 endif()
 
 target_include_directories(secure-buffer PUBLIC
@@ -73,7 +89,7 @@ install(FILES
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/secure-buffer
 )
 
-if(PROJECT_IS_TOP_LEVEL)
+if(SECURE_BUFFER_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()

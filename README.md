@@ -73,8 +73,18 @@ std::string unsafe = to_unsecure_string(bytes);
 
 ### CMake find_package (installed library)
 
+Build and install the library without its tests, configured with the same compiler, toolchain file and options as the project that uses it:
+
+```bash
+cmake -B build -DSECURE_BUFFER_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+cmake --install build --config Release --prefix <prefix>
+```
+
+Then point `CMAKE_PREFIX_PATH` at `<prefix>`:
+
 ```cmake
-find_package(secure-buffer 0.10.0 REQUIRED)
+find_package(secure-buffer 0.10.1 REQUIRED)
 target_link_libraries(my_project PRIVATE safeheron::secure-buffer)
 ```
 
@@ -86,7 +96,7 @@ include(FetchContent)
 FetchContent_Declare(
     secure-buffer
     GIT_REPOSITORY https://github.com/Safeheron/secure-buffer-cpp.git
-    GIT_TAG v0.10.0
+    GIT_TAG v0.10.1
 )
 FetchContent_MakeAvailable(secure-buffer)
 
@@ -112,9 +122,21 @@ cmake --build build --config Debug
 ctest --test-dir build -C Debug --output-on-failure
 ```
 
-Requires CMake 3.28+ and a C++17 compiler. `--config` / `-C` select the configuration for multi-config generators (Visual Studio, Xcode) and have no effect otherwise. Google Test (BSD-3-Clause) is fetched at configure time and is never installed.
+Requires CMake 3.28+ and a C++17 compiler. `--config` / `-C` select the configuration for multi-config generators (Visual Studio, Xcode) and have no effect otherwise. Google Test (BSD-3-Clause) is fetched at configure time when the tests are built, and is never installed.
 
-CI covers Linux (GCC and Clang, libstdc++ and libc++, plus an ASan/UBSan build), macOS (Apple Clang) and Windows (MSVC); see `.github/workflows/ci.yml`.
+CI covers Linux (GCC and Clang, libstdc++ and libc++, plus an ASan/UBSan build), macOS (Apple Clang) and Windows (MSVC); see `.github/workflows/ci.yml`. An integration job (`tests/integration/run.sh`) checks installation, use through `find_package` and `add_subdirectory` with and without the tests, and that settings passed in from outside take effect.
+
+## Build Options
+
+- `SECURE_BUFFER_BUILD_TESTS`: ON by default when this is the top-level project, OFF when it is added as a subproject. When OFF, Google Test is not downloaded, built or installed. When a parent project turns it ON, the parent's top-level `CMakeLists.txt` must call `enable_testing()` for the parent's `ctest` to find these tests; otherwise run `ctest` in the library's build directory.
+- Settings defined by the user, a toolchain file or a parent project take precedence. Otherwise the library target uses these defaults:
+  - C++17 without compiler extensions (`CMAKE_CXX_STANDARD`, `CMAKE_CXX_EXTENSIONS`);
+  - position-independent code, so the library can be linked into a shared library (`CMAKE_POSITION_INDEPENDENT_CODE`);
+  - no C++20 module scanning of its source, which has no modules (`CMAKE_CXX_SCAN_FOR_MODULES`), so a C++20 build with Ninja does not need `clang-scan-deps` for it;
+  - warnings as errors only when the tests are built (`CMAKE_COMPILE_WARNING_AS_ERROR`; `cmake --compile-no-warning-as-error` turns it off).
+
+  None of these defaults reaches the parent project. The tests use the same C++ standard defaults, which also apply to Google Test; warnings as errors never do.
+- The library is always static; `BUILD_SHARED_LIBS` does not apply to it.
 
 ## Security Notes
 

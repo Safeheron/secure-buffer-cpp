@@ -1,3 +1,13 @@
+# Defaults for the test targets and GoogleTest (this directory only), unless
+# the user set them.
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+endif()
+if(NOT DEFINED CMAKE_CXX_EXTENSIONS)
+    set(CMAKE_CXX_EXTENSIONS OFF)
+endif()
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -12,15 +22,25 @@ FetchContent_MakeAvailable(googletest)
 if(MSVC)
     # /permissive- is standard-conformance mode (not a warning switch): the
     # overload-resolution pins in the tests assert standard C++ behavior.
-    set(TEST_COMPILE_OPTIONS /W4 /WX /permissive-)
+    set(TEST_COMPILE_OPTIONS /W4 /permissive-)
 else()
-    set(TEST_COMPILE_OPTIONS -Wall -Wextra -Werror)
+    set(TEST_COMPILE_OPTIONS -Wall -Wextra)
 endif()
+
+# Warning options for a test target, and warnings as errors unless
+# CMAKE_COMPILE_WARNING_AS_ERROR is set. Only this project's own test targets
+# use it; GoogleTest's targets never do.
+function(secure_buffer_test_options TARGET)
+    target_compile_options(${TARGET} PRIVATE ${TEST_COMPILE_OPTIONS})
+    if(NOT DEFINED CMAKE_COMPILE_WARNING_AS_ERROR)
+        set_target_properties(${TARGET} PROPERTIES COMPILE_WARNING_AS_ERROR ON)
+    endif()
+endfunction()
 
 function(add_secure_buffer_test TEST_NAME TEST_SOURCE)
     add_executable(${TEST_NAME} ${TEST_SOURCE})
     target_link_libraries(${TEST_NAME} PRIVATE safeheron::secure-buffer GTest::gtest_main)
-    target_compile_options(${TEST_NAME} PRIVATE ${TEST_COMPILE_OPTIONS})
+    secure_buffer_test_options(${TEST_NAME})
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endfunction()
 
@@ -132,7 +152,7 @@ endif()
 if(SB_HAS_CXX20_THREE_WAY)
     add_executable(test_comparison_cxx20 test_comparison_cxx20.cpp)
     target_link_libraries(test_comparison_cxx20 PRIVATE safeheron::secure-buffer)
-    target_compile_options(test_comparison_cxx20 PRIVATE ${TEST_COMPILE_OPTIONS})
+    secure_buffer_test_options(test_comparison_cxx20)
     set_target_properties(test_comparison_cxx20 PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
     add_test(NAME test_comparison_cxx20 COMMAND test_comparison_cxx20)
 else()
