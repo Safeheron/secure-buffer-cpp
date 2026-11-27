@@ -2,7 +2,7 @@
 #include <secure-buffer/secure_utils.h>
 #include <string>
 
-using namespace safeheron::secure_buffer;
+using namespace safeheron::sbuf;
 
 // --- to_secure_bytes(const std::string&) ---
 

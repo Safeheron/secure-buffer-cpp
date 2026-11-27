@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 project(secure-buffer
-    VERSION 0.10.1
+    VERSION 0.11.0
     LANGUAGES CXX
     DESCRIPTION "C++17 secure-buffer base library (header-first API + tiny compiled core)"
 )

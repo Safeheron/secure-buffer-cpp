@@ -10,8 +10,8 @@
 #include <array>
 #include <cstdint>
 
-using safeheron::secure_buffer::ScopedCleanse;
-using safeheron::secure_buffer::SecureArray;
+using safeheron::sbuf::ScopedCleanse;
+using safeheron::sbuf::SecureArray;
 
 namespace {
 

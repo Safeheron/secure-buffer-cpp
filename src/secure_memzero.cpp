@@ -15,7 +15,7 @@
 #endif
 
 namespace safeheron {
-namespace secure_buffer {
+namespace sbuf {
 
 void secure_memzero(void* ptr, std::size_t len) noexcept {
     if (len == 0) return;
@@ -43,5 +43,5 @@ void secure_memzero(void* ptr, std::size_t len) noexcept {
 #endif
 }
 
-} // namespace secure_buffer
+} // namespace sbuf
 } // namespace safeheron

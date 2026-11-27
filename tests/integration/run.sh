@@ -122,7 +122,7 @@ PY
 defines_memzero() {  # defines_memzero <binary>: secure_memzero is linked into it
     local symbols
     symbols=$(nm -C "$1") || return 1
-    grep -q 'T safeheron::secure_buffer::secure_memzero(' <<<"$symbols" ||
+    grep -q 'T safeheron::sbuf::secure_memzero(' <<<"$symbols" ||
         { echo "no defined secure_memzero in $1"; return 1; }
 }
 

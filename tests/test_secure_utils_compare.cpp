@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <utility>
 
-using namespace safeheron::secure_buffer;
+using namespace safeheron::sbuf;
 
 // --- constant_time_equal(const void*, const void*, size_t) ---
 
@@ -157,7 +157,7 @@ TEST(ConstantTimeEqualSecureArrayTest, ZeroLength) {
 
 // --- constant_time_equal(span<const uint8_t>, span<const uint8_t>) ---
 
-using CSpan = compat::span<const uint8_t>;
+using CSpan = span<const uint8_t>;
 
 static_assert(noexcept(constant_time_equal(CSpan(), CSpan())), "noexcept");
 
@@ -196,8 +196,8 @@ TEST(ConstantTimeEqualSpanTest, ImplicitConversions) {
     uint8_t raw1[4] = {1, 2, 3, 4}, raw2[4] = {1, 2, 3, 4};
     std::array<uint8_t, 4> arr1{{1, 2, 3, 4}};
     std::array<uint8_t, 4> arr2 = arr1;
-    compat::span<uint8_t> mut(raw1);
-    compat::span<const uint8_t, 4> fixed(raw2);
+    span<uint8_t> mut(raw1);
+    span<const uint8_t, 4> fixed(raw2);
     EXPECT_TRUE(constant_time_equal(raw1, raw2));
     EXPECT_TRUE(constant_time_equal(arr1, arr2));
     EXPECT_TRUE(constant_time_equal(mut, fixed));
@@ -207,7 +207,7 @@ TEST(ConstantTimeEqualSpanTest, ImplicitConversions) {
 }
 
 TEST(ConstantTimeEqualSpanTest, ZeroLengthStaticViews) {
-    compat::span<const uint8_t, 0> e1;
-    compat::span<const uint8_t, 0> e2;
+    span<const uint8_t, 0> e1;
+    span<const uint8_t, 0> e2;
     EXPECT_TRUE(constant_time_equal(e1, e2));
 }

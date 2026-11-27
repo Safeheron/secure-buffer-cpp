@@ -10,7 +10,7 @@
 #include <new>
 #include <string_view>
 
-using namespace safeheron::secure_buffer;
+using namespace safeheron::sbuf;
 
 namespace {
     std::size_t g_new_count = 0;

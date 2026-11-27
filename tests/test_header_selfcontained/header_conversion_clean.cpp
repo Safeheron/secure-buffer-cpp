@@ -16,10 +16,10 @@ struct Keys {
 } // namespace
 
 template <>
-struct safeheron::secure_buffer::enable_secure_cleanse<Keys> : std::true_type {};
+struct safeheron::sbuf::enable_secure_cleanse<Keys> : std::true_type {};
 
 int main() {
-    using namespace safeheron::secure_buffer;
+    using namespace safeheron::sbuf;
 
     SecureArray<std::uint32_t, 8> words;
     words[1] = 2;
@@ -42,8 +42,8 @@ int main() {
     secure_cleanse(key_array);
 
     std::size_t n = 2;
-    compat::span<std::uint8_t> raw_view(raw, sizeof(raw));
-    compat::span<const std::uint32_t, 8> word_view(words.data(), words.size());
+    span<std::uint8_t> raw_view(raw, sizeof(raw));
+    span<const std::uint32_t, 8> word_view(words.data(), words.size());
     same = raw_view.first(n).size() + raw_view.last(n).size() == 2 * n && same;
     same = raw_view.subspan(n, n)[0] == raw[n] && raw_view.subspan(n).size_bytes() == 14 && same;
     same = word_view.subspan(n, n)[0] == words[n] && word_view.first(n).size_bytes() == 8 && same;
@@ -53,13 +53,13 @@ int main() {
     same = word_view.first<2>()[1] == words[1] && word_view.last<2>()[1] == words[7] && same;
     same = word_view.subspan<2>().size_bytes() == 24 && word_view.subspan<2, 3>()[2] == words[4] &&
            same;
-    compat::span<const std::uint8_t, 16> fixed_view = raw;
-    compat::span<const std::uint8_t> dynamic_view = fixed_view;
-    compat::span<const std::uint8_t, 16> back_view(dynamic_view);
-    compat::span<const Keys, 2> key_view = key_array;
-    compat::span<const std::uint8_t> empty_view;
+    span<const std::uint8_t, 16> fixed_view = raw;
+    span<const std::uint8_t> dynamic_view = fixed_view;
+    span<const std::uint8_t, 16> back_view(dynamic_view);
+    span<const Keys, 2> key_view = key_array;
+    span<const std::uint8_t> empty_view;
     const std::array<std::uint32_t, 8> const_words{};
-    compat::span<const std::uint32_t, 8> const_word_view(const_words);
+    span<const std::uint32_t, 8> const_word_view(const_words);
     same = empty_view.begin() == empty_view.end() && empty_view.empty() && same;
     same = static_cast<std::size_t>(const_word_view.end() - const_word_view.begin()) == 8 && same;
     same = back_view.data() == raw && key_view.size() == 2 && same;
@@ -76,8 +76,8 @@ int main() {
 
     SecureArray<std::uint8_t, 16> ct_a;
     SecureArray<std::uint8_t, 16> ct_b;
-    compat::span<const std::uint8_t> ct_lhs = as_span(ct_a);
-    compat::span<const std::uint8_t> ct_rhs = as_span(ct_b);
+    span<const std::uint8_t> ct_lhs = as_span(ct_a);
+    span<const std::uint8_t> ct_rhs = as_span(ct_b);
     same = constant_time_equal(ct_lhs, ct_rhs) && same;
 
     SecureBytes sb = make_secure_bytes<32>();

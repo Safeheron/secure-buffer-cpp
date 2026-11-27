@@ -9,10 +9,10 @@ struct Plain {
     uint8_t a[8];
 };
 template <>
-struct safeheron::secure_buffer::enable_secure_cleanse<Plain> : std::true_type {};
+struct safeheron::sbuf::enable_secure_cleanse<Plain> : std::true_type {};
 
 int main() {
-    safeheron::secure_buffer::SecureArray<Plain, 2> x;
+    safeheron::sbuf::SecureArray<Plain, 2> x;
     (void)x;
     return 0;
 }

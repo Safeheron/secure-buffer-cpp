@@ -8,10 +8,10 @@
 #include <utility>
 #include <vector>
 
-using safeheron::secure_buffer::SecureArray;
-using safeheron::secure_buffer::SecureBytes;
-using safeheron::secure_buffer::SecureString;
-using safeheron::secure_buffer::constant_time_equal;
+using safeheron::sbuf::SecureArray;
+using safeheron::sbuf::SecureBytes;
+using safeheron::sbuf::SecureString;
+using safeheron::sbuf::constant_time_equal;
 
 namespace {
 

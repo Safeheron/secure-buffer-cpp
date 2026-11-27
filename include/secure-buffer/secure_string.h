@@ -17,7 +17,7 @@
 #include <secure-buffer/secure_bytes.h>
 
 namespace safeheron {
-namespace secure_buffer {
+namespace sbuf {
 
 /// Owning, length-aware string whose storage is wiped on release.
 ///
@@ -396,7 +396,7 @@ static_assert(!std::is_convertible<const char*, SecureString>::value,
 static_assert(!std::is_convertible<std::string, SecureString>::value,
               "entering the secure world is explicit: SecureString(str) or to_secure_string(str)");
 
-} // namespace secure_buffer
+} // namespace sbuf
 } // namespace safeheron
 
 #endif // SAFEHERON_SECURE_STRING_H

@@ -14,7 +14,7 @@ option(SB_CONSUMER_ENABLE_TESTS
 enable_testing()
 
 if(SB_CONSUMER_MODE STREQUAL "package")
-    find_package(secure-buffer 0.10.1 REQUIRED)
+    find_package(secure-buffer 0.11.0 REQUIRED)
 elseif(SB_CONSUMER_MODE STREQUAL "subdirectory")
     if(NOT SB_CONSUMER_CXX_STANDARD STREQUAL "")
         set(CMAKE_CXX_STANDARD ${SB_CONSUMER_CXX_STANDARD})

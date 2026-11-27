@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-using namespace safeheron::secure_buffer;
+using namespace safeheron::sbuf;
 using A = SecureArray<uint8_t, 32>;
 
 static_assert(A::size() == 32 && !A::empty() && SecureArray<uint8_t, 0>::empty(),
@@ -42,10 +42,10 @@ template <class T>
 struct can_as_writable_span<T, std::void_t<decltype(as_writable_span(std::declval<T>()))>>
     : std::true_type {};
 
-static_assert(std::is_same<decltype(as_span(std::declval<const A&>())), compat::span<const uint8_t, 32>>::value &&
-              std::is_same<decltype(as_writable_span(std::declval<A&>())), compat::span<uint8_t, 32>>::value &&
+static_assert(std::is_same<decltype(as_span(std::declval<const A&>())), span<const uint8_t, 32>>::value &&
+              std::is_same<decltype(as_writable_span(std::declval<A&>())), span<uint8_t, 32>>::value &&
               std::is_same<decltype(as_span(std::declval<const SecureArray<uint32_t, 4>&>())),
-                           compat::span<const uint32_t, 4>>::value,
+                           span<const uint32_t, 4>>::value,
               "as_span keeps the element type and the length");
 static_assert(can_as_span<A&>::value && can_as_span<const A&>::value &&
               !can_as_span<A>::value && !can_as_span<const A>::value,
@@ -254,7 +254,7 @@ TEST(SecureArrayTest, AsSpanSeesCleanse) {
 TEST(SecureArrayTest, AsSpanZeroLength) {
     SecureArray<uint8_t, 0> z;
     auto v = as_span(z);
-    static_assert(std::is_same<decltype(v), compat::span<const uint8_t, 0>>::value, "");
+    static_assert(std::is_same<decltype(v), span<const uint8_t, 0>>::value, "");
     EXPECT_TRUE(v.empty());
     auto f = v.first<0>();
     auto s = v.subspan<0>();

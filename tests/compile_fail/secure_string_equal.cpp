@@ -2,8 +2,8 @@
 #include <secure-buffer/secure_buffer.h>
 
 int main() {
-    safeheron::secure_buffer::SecureString a;
-    safeheron::secure_buffer::SecureString b;
+    safeheron::sbuf::SecureString a;
+    safeheron::sbuf::SecureString b;
     (void)(a == b);
     return 0;
 }

@@ -11,7 +11,7 @@ Installation and a quick start are in the [README](README.md). This guide specif
 | Fixed-size secrets you own or return by value (keys, seeds, nonces of known length) | `SecureArray<T, N>` |
 | Existing fixed-size buffers and integers | `ScopedCleanse` / `secure_cleanse()` |
 | Plain-data structs of fixed-size fields, including third-party types | register with `enable_secure_cleanse`, then `ScopedCleanse` / `secure_cleanse()` |
-| Borrowing contiguous memory without owning or wiping it (function parameters, fields of a buffer) | `compat::span<T>` (run-time length) / `compat::span<T, N>` (compile-time length); `as_span()` / `as_writable_span()` for a `SecureArray` |
+| Borrowing contiguous memory without owning or wiping it (function parameters, fields of a buffer) | `sbuf::span<T>` (run-time length) / `sbuf::span<T, N>` (compile-time length); `as_span()` / `as_writable_span()` for a `SecureArray` |
 
 ## SecureString
 
@@ -120,7 +120,7 @@ for (uint8_t b : seed) { ... }                 // raw-pointer iterators
 
 - **Copies.** Every copy is a separate array that wipes itself on destruction.
 - **Moves are copies**, as for `std::array`: the source keeps its value until it is destroyed. Call `secure_cleanse(source)` to wipe it sooner.
-- **No conversion to or from `std::array`.** Pass `data()` and `size()`, or borrow a view with `as_span(a)` / `as_writable_span(a)` (see [Views: compat::span](#views-compatspan)).
+- **No conversion to or from `std::array`.** Pass `data()` and `size()`, or borrow a view with `as_span(a)` / `as_writable_span(a)` (see [Views: sbuf::span](#views-sbufspan)).
 - **Returning.** Write `return result;`, not `return std::move(result);`. The plain form lets the compiler construct the result in place; `std::move` forces a copy, after which the local is wiped when it is destroyed.
 - **Access.** `operator[]`, `front()` and `back()` assert their preconditions in debug builds; `at()` throws `std::out_of_range`.
 - **Copies out of the array.** Bytes copied out through `data()` are not protected; keep the secret in a `SecureArray`, or guard each copy.
@@ -128,41 +128,41 @@ for (uint8_t b : seed) { ... }                 // raw-pointer iterators
 - **Pass by `const&`.** By-value parameters, by-value lambda captures and range-for by value each make a copy. The copies are wiped, but more copies of the secret exist meanwhile.
 - **Comparison.** There is no `operator==` or `!=`; use `constant_time_equal(a, b)` for two arrays of the same type.
 
-## Views: compat::span
+## Views: sbuf::span
 
-`#include <secure-buffer/compat/span.h>` (also included by `secure_buffer.h`). `safeheron::secure_buffer::compat::span<T, Extent>` is a non-owning view of contiguous memory: a C++17 subset of C++20 `std::span`. Code written against it compiles unchanged once the library switches to `std::span`. `span<T>` has a run-time length; `span<T, N>` has a compile-time length. `compat::dynamic_extent` is the run-time-length marker.
+`#include <secure-buffer/compat/span.h>` (also included by `secure_buffer.h`). `safeheron::sbuf::span<T, Extent>` is a non-owning view of contiguous memory: a C++17 subset of C++20 `std::span`. The class itself is defined in `safeheron::sbuf::compat`, so `sbuf::compat::span` names the same type; it will be replaced by `std::span` once that is available everywhere, and code written against `sbuf::span` compiles unchanged then. `span<T>` has a run-time length; `span<T, N>` has a compile-time length. `sbuf::dynamic_extent` is the run-time-length marker.
 
 - **Constructors.** From built-in arrays and `std::array` (the length must match a static `N`), and from `(pointer, count)`, which is `explicit` for a static length.
 - **Conversions.** Adding `const` is implicit (`span<uint8_t>` to `span<const uint8_t>`). Static to dynamic length is implicit; dynamic to static is explicit. `span<T, N>` with `N > 0` has no default constructor.
 - **No container constructor.** Borrow a `SecureBytes` or `std::vector` with `span<T>(v.data(), v.size())`, and a `SecureArray` with `as_span(a)` (read-only, `span<const T, N>`) or `as_writable_span(a)` (`span<T, N>`). `as_span` of a temporary `SecureArray` does not compile; neither does `as_writable_span`, which takes a modifiable lvalue.
 
 ```cpp
-using namespace safeheron::secure_buffer;
+using namespace safeheron::sbuf;
 
 SecureArray<uint8_t, 128> key;
-auto whole = as_span(key);                    // compat::span<const uint8_t, 128>
-auto a = whole.first<32>();                   // compat::span<const uint8_t, 32>
-auto b = whole.subspan<32, 32>();             // compat::span<const uint8_t, 32>
+auto whole = as_span(key);                    // span<const uint8_t, 128>
+auto a = whole.first<32>();                   // span<const uint8_t, 32>
+auto b = whole.subspan<32, 32>();             // span<const uint8_t, 32>
 // whole.subspan<64, 128>();                  // does not compile: out of range
 
 // Cursor: take fixed-size fields from a run-time-length view
-compat::span<const uint8_t> in = whole;
+span<const uint8_t> in = whole;
 while (in.size() >= 4) {
-    compat::span<const uint8_t, 4> field = in.first<4>();
+    span<const uint8_t, 4> field = in.first<4>();
     use(field);
     in = in.subspan(4);                       // run-time slice: always dynamic length
 }
 ```
 
 - **Slices.** `first(n)`, `last(n)` and `subspan(o, n)` always return a dynamic-length span. `first<N>()`, `last<N>()` and `subspan<O, C>()` return a static-length span; on a static-length source an out-of-range slice is a compile error. On a dynamic-length source the same bounds are run-time preconditions, except that `subspan<O, C>()` with a `C` other than `dynamic_extent` above `SIZE_MAX - O`, a count no real object can have, is still a compile error; `subspan<O>()` (the rest of the view) is not affected.
-- **Debug-only checks.** Preconditions (index and slice bounds, `(p, n)` with `n != N`, dynamic to static length) are checked by `assert` only, so `NDEBUG` alone controls them. Standard-library hardening modes (`_GLIBCXX_ASSERTIONS`, libc++ hardening, MSVC checked iterators) do not apply to `compat::span`, even though they do apply to `std::span`. Validate lengths from external input before slicing.
-- **Common subset.** Do not rely on the constructors and slices being `noexcept`, on the `iterator` type, on `sizeof(span)`, or on the debug assertions: `std::span` does not promise them. The iterator is a class, not a pointer: for a pointer, use `s.data()`, or `s.data() + (it - s.begin())` for the element at `it`. Iterators of spans with different extents or element constness (`span<int>` and `span<const int>`, `span<int, 4>` and `span<int>`) do not convert to each other and cannot be compared or subtracted; take both from the same span. `s.begin() + n` with a `size_t` `n` converts `n` to the signed `difference_type` and warns under `-Wsign-conversion`, as with `std::span`; use `s.data() + n` or `s.subspan(n)`. Under C++20, `compat::span` is a random-access range but not a contiguous range (`std::ranges::contiguous_range` is false), and it is neither a borrowed range nor a view (`std::ranges::borrowed_range` and `std::ranges::view` are false), while `std::span` is all three.
+- **Debug-only checks.** Preconditions (index and slice bounds, `(p, n)` with `n != N`, dynamic to static length) are checked by `assert` only, so `NDEBUG` alone controls them. Standard-library hardening modes (`_GLIBCXX_ASSERTIONS`, libc++ hardening, MSVC checked iterators) do not apply to `sbuf::span`, even though they do apply to `std::span`. Validate lengths from external input before slicing.
+- **Common subset.** Do not rely on the constructors and slices being `noexcept`, on the `iterator` type, on `sizeof(span)`, or on the debug assertions: `std::span` does not promise them. The iterator is a class, not a pointer: for a pointer, use `s.data()`, or `s.data() + (it - s.begin())` for the element at `it`. Iterators of spans with different extents or element constness (`span<int>` and `span<const int>`, `span<int, 4>` and `span<int>`) do not convert to each other and cannot be compared or subtracted; take both from the same span. `s.begin() + n` with a `size_t` `n` converts `n` to the signed `difference_type` and warns under `-Wsign-conversion`, as with `std::span`; use `s.data() + n` or `s.subspan(n)`. Under C++20, `sbuf::span` is a random-access range but not a contiguous range (`std::ranges::contiguous_range` is false), and it is neither a borrowed range nor a view (`std::ranges::borrowed_range` and `std::ranges::view` are false), while `std::span` is all three.
 - **Template deduction ignores conversions.** `template <size_t N> void f(span<const uint8_t, N>)` cannot be called with a `std::array`. Derive the length from another template parameter, or pass a `span<const uint8_t, N>`.
 
 ```cpp
-template <size_t N> void f(compat::span<const uint8_t, N>);
+template <size_t N> void f(span<const uint8_t, N>);
 std::array<uint8_t, 4> arr{};
-f(compat::span<const uint8_t, 4>(arr));       // OK
+f(span<const uint8_t, 4>(arr));               // OK
 // f(arr);                                    // does not compile: N cannot be deduced
 ```
 
@@ -180,8 +180,8 @@ Lifetime and security:
 
 Writing the type:
 
-- In headers, spell it `safeheron::secure_buffer::compat::span<...>` (or `secure_buffer::compat::span<...>` inside `namespace safeheron`). Do not add a namespace-scope `using` declaration or directive for it: the name would become part of your header's interface and can be ambiguous with `std::span` under C++20. A block-scope `using` and `.cpp` files are fine.
-- Do not switch to `std::span` on your own; the library's signatures use `compat::span`.
+- In headers, spell it `safeheron::sbuf::span<...>` (or `sbuf::span<...>` inside `namespace safeheron`). Do not add a namespace-scope `using` declaration or directive for it: the name would become part of your header's interface and can be ambiguous with `std::span` under C++20. A block-scope `using` and `.cpp` files are fine, except under C++20: wherever both `using namespace std;` and `using namespace safeheron::sbuf;` are in effect, bare `span` and `dynamic_extent` are ambiguous, even when the two directives sit in different scopes (for example `std` at file scope and `safeheron::sbuf` inside a function); qualify them there.
+- Do not switch to `std::span` on your own; the library's signatures use `sbuf::span`.
 - No convenience aliases (such as byte-view names) are provided. Define domain names yourself, for example `using Seed = SecureArray<uint8_t, 32>;`.
 - For text secrets, use `SecureString::view()`.
 - Not provided: `front()`, `back()`, `rbegin()`, `rend()`, `at()`, `cbegin()`, `cend()`, `as_bytes()`, `as_writable_bytes()`, iterator-pair constructors, comparison operators, and deduction guides for generic containers.
@@ -203,12 +203,12 @@ The source `std::string` is not wiped; that remains the caller's responsibility.
 Use `constant_time_equal` wherever timing is attacker-observable (MACs, tokens, keys). For inputs of equal length its running time is independent of the contents; inputs of different length return `false` immediately, so compare fixed-length values such as digests rather than variable-length passwords. View-based comparisons and `std::equal` are short-circuit and suitable only for tests and non-secret data.
 
 ```cpp
-if (constant_time_equal(mac1, mac2)) { ... }                                       // SecureBytes / SecureString / SecureArray of the same type
-if (safeheron::secure_buffer::constant_time_equal(a.data(), b.data(), 32)) { ... } // raw pointers
-if (safeheron::secure_buffer::constant_time_equal(tag, expected)) { ... }          // byte spans, std::array<uint8_t, N> or uint8_t[N]
+if (constant_time_equal(mac1, mac2)) { ... }                              // SecureBytes / SecureString / SecureArray of the same type
+if (safeheron::sbuf::constant_time_equal(a.data(), b.data(), 32)) { ... } // raw pointers
+if (safeheron::sbuf::constant_time_equal(tag, expected)) { ... }          // byte spans, std::array<uint8_t, N> or uint8_t[N]
 ```
 
-The raw-pointer and byte-span overloads are not found by argument-dependent lookup (their arguments are pointers, spans, `std::array` or built-in arrays): call them qualified, as above, or with `using namespace safeheron::secure_buffer;` in scope.
+The raw-pointer and byte-span overloads are not found by argument-dependent lookup (their arguments are pointers, spans, `std::array` or built-in arrays): call them qualified, as above, or with `using namespace safeheron::sbuf;` in scope.
 
 `SecureBytes`, `SecureString` and `SecureArray` have no comparison operators: `a == b` (and `!=`, `<`, `>`, `<=`, `>=`, `<=>`) does not compile, so a secret cannot be compared by accident with a short-circuit operator. For non-secret data, use `std::equal` (`SecureBytes`, `SecureArray`) or `view()` (`SecureString`):
 
@@ -272,13 +272,13 @@ struct SessionKeys {
 }  // namespace app
 
 template <>
-struct safeheron::secure_buffer::enable_secure_cleanse<app::SessionKeys> : std::true_type {};
+struct safeheron::sbuf::enable_secure_cleanse<app::SessionKeys> : std::true_type {};
 
 app::SessionKeys keys = derive_session_keys(master);
 ScopedCleanse guard(keys);
 ```
 
-The specialization may be written at global scope with the qualified name, as above, or inside namespace `safeheron::secure_buffer`. It cannot be written inside the namespace of the type itself.
+The specialization may be written at global scope with the qualified name, as above, or inside namespace `safeheron::sbuf`. It cannot be written inside the namespace of the type itself.
 
 Every use of a registered type is checked, including as an array element, and the checks cannot be turned off, for your own types and third-party types alike. The type must be:
 
@@ -321,7 +321,7 @@ static_assert(sizeof(vendor::KdfState) == 200,
               "vendor::KdfState layout changed; re-check it before wiping");
 
 template <>
-struct safeheron::secure_buffer::enable_secure_cleanse<vendor::KdfState> : std::true_type {};
+struct safeheron::sbuf::enable_secure_cleanse<vendor::KdfState> : std::true_type {};
 
 #endif // KDF_CLEANSE_H
 ```
@@ -348,7 +348,7 @@ class Poly {
     Poly(const Poly&) noexcept = default;
     Poly& operator=(const Poly&) noexcept = default;
     // Every Poly, named or temporary, is wiped when its lifetime ends.
-    ~Poly() { safeheron::secure_buffer::secure_memzero(&coeffs_, sizeof(coeffs_)); }
+    ~Poly() { safeheron::sbuf::secure_memzero(&coeffs_, sizeof(coeffs_)); }
 
  private:
     std::array<Coeff, 256> coeffs_{};

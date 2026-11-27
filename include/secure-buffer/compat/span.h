@@ -11,7 +11,7 @@
 #include <type_traits>
 
 namespace safeheron {
-namespace secure_buffer {
+namespace sbuf {
 namespace compat {
 
 /// The extent of a span whose length is known only at run time.
@@ -361,7 +361,19 @@ template <typename T, std::size_t N>
 span(T (&&)[N]) -> span<T>;
 
 } // namespace compat
-} // namespace secure_buffer
+} // namespace sbuf
+} // namespace safeheron
+
+namespace safeheron {
+namespace sbuf {
+
+// The documented spelling. The class lives in compat, so a span does not by
+// itself make this namespace an associated namespace for argument-dependent
+// lookup (as with std::span); its element type still contributes its own.
+using compat::span;
+using compat::dynamic_extent;
+
+} // namespace sbuf
 } // namespace safeheron
 
 #endif // SAFEHERON_SECURE_BUFFER_COMPAT_SPAN_H

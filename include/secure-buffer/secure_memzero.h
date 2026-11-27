@@ -7,13 +7,13 @@
 #include <cstddef>
 
 namespace safeheron {
-namespace secure_buffer {
+namespace sbuf {
 
 /// Zeroes len bytes at ptr; the compiler cannot elide it.
 // Defined in src/secure_memzero.cpp, the only platform-specific source.
 void secure_memzero(void* ptr, std::size_t len) noexcept;
 
-} // namespace secure_buffer
+} // namespace sbuf
 } // namespace safeheron
 
 #endif // SAFEHERON_SECURE_MEMZERO_H

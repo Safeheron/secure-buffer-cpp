@@ -56,7 +56,7 @@ void operator delete[](void* p, std::size_t) noexcept { intercept_free(p); }
 void operator delete(void* p, const std::nothrow_t&) noexcept { intercept_free(p); }
 void operator delete[](void* p, const std::nothrow_t&) noexcept { intercept_free(p); }
 
-using SecureBytes = std::vector<uint8_t, safeheron::secure_buffer::SecureAllocator<uint8_t>>;
+using SecureBytes = std::vector<uint8_t, safeheron::sbuf::SecureAllocator<uint8_t>>;
 
 TEST(SecureAllocatorZeroingTest, DeallocateZerosMemory) {
     reset();
@@ -87,9 +87,9 @@ TEST(SecureAllocatorZeroingTest, ReallocZerosOldBuffer) {
 }
 
 TEST(SecureAllocatorZeroingTest, AllocatorEquality) {
-    safeheron::secure_buffer::SecureAllocator<uint8_t> a1;
-    safeheron::secure_buffer::SecureAllocator<uint8_t> a2;
-    safeheron::secure_buffer::SecureAllocator<int> a3;
+    safeheron::sbuf::SecureAllocator<uint8_t> a1;
+    safeheron::sbuf::SecureAllocator<uint8_t> a2;
+    safeheron::sbuf::SecureAllocator<int> a3;
 
     EXPECT_TRUE(a1 == a2);
     EXPECT_FALSE(a1 != a2);

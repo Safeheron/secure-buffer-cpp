@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-using namespace safeheron::secure_buffer;
+using namespace safeheron::sbuf;
 using detail::is_cleansable;
 using detail::is_cleansable_scalar;
 
@@ -60,7 +60,7 @@ struct KdfState { std::array<uint8_t, 48> chain; uint64_t counter; };
 
 // Own types: specialized inside the library namespace.
 namespace safeheron {
-namespace secure_buffer {
+namespace sbuf {
 template <> struct enable_secure_cleanse<SessionKeys> : std::true_type {};
 template <> struct enable_secure_cleanse<Padded> : std::true_type {};
 template <> struct enable_secure_cleanse<Word> : std::true_type {};
@@ -72,11 +72,11 @@ template <> struct enable_secure_cleanse<Mode> : std::true_type {};
 template <> struct enable_secure_cleanse<AddrOverload> : std::true_type {};
 template <> struct enable_secure_cleanse<AddrDeleted> : std::true_type {};
 template <> struct enable_secure_cleanse<uint8_t*> : std::true_type {};
-} // namespace secure_buffer
+} // namespace sbuf
 } // namespace safeheron
 
 // Third-party type: specialized at global scope with the qualified name.
-template <> struct safeheron::secure_buffer::enable_secure_cleanse<vendor::KdfState> : std::true_type {};
+template <> struct safeheron::sbuf::enable_secure_cleanse<vendor::KdfState> : std::true_type {};
 
 // --- Whitelist ---
 static_assert(is_cleansable_scalar<uint8_t>::value && is_cleansable_scalar<bool>::value &&
