@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-using namespace safeheron::secure_buffer;
+using namespace safeheron::sbuf;
 
 namespace {
 
@@ -142,7 +142,7 @@ TEST(SecureBytesTest, InsertEraseShrinkToFit) {
 }
 
 TEST(SecureAllocatorTest, AllocateReturnsUsablePointer) {
-    safeheron::secure_buffer::SecureAllocator<uint8_t> alloc;
+    safeheron::sbuf::SecureAllocator<uint8_t> alloc;
     uint8_t* p = alloc.allocate(16);
     ASSERT_NE(p, nullptr);
     for (int i = 0; i < 16; ++i) p[i] = static_cast<uint8_t>(i);

@@ -2,8 +2,8 @@
 #include <secure-buffer/secure_buffer.h>
 
 int main() {
-    safeheron::secure_buffer::SecureBytes a;
-    safeheron::secure_buffer::SecureBytes b;
+    safeheron::sbuf::SecureBytes a;
+    safeheron::sbuf::SecureBytes b;
     (void)(a < b);
     return 0;
 }

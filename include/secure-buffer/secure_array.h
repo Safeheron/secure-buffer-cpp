@@ -15,7 +15,7 @@
 #include <secure-buffer/secure_memzero.h>
 
 namespace safeheron {
-namespace secure_buffer {
+namespace sbuf {
 
 /// Fixed-size array of N integers (or std::byte), zero-initialized and wiped
 /// on destruction. Use it for secrets whose size is known at compile time.
@@ -135,16 +135,16 @@ void secure_cleanse(SecureArray<T, N>& array) noexcept {
 /// Borrows the elements as a view of compile-time length N. The view does not
 /// extend the array's lifetime and does not wipe anything.
 template <typename T, std::size_t N>
-compat::span<const T, N> as_span(const SecureArray<T, N>& a) noexcept {
-    return compat::span<const T, N>(a.data(), N);
+span<const T, N> as_span(const SecureArray<T, N>& a) noexcept {
+    return span<const T, N>(a.data(), N);
 }
 
 /// Borrows the elements as a modifiable view of compile-time length N. Same
 /// lifetime rules as as_span; it takes a modifiable lvalue, so temporaries are
 /// rejected.
 template <typename T, std::size_t N>
-compat::span<T, N> as_writable_span(SecureArray<T, N>& a) noexcept {
-    return compat::span<T, N>(a.data(), N);
+span<T, N> as_writable_span(SecureArray<T, N>& a) noexcept {
+    return span<T, N>(a.data(), N);
 }
 
 // A view of a temporary would dangle once the array is wiped at the end of
@@ -169,7 +169,7 @@ static_assert(!std::is_convertible<std::array<unsigned char, 32>,
                                    SecureArray<unsigned char, 32>>::value,
               "SecureArray is not built from a std::array");
 
-} // namespace secure_buffer
+} // namespace sbuf
 } // namespace safeheron
 
 #endif // SAFEHERON_SECURE_ARRAY_H

@@ -9,7 +9,7 @@
 #include <secure-buffer/secure_memzero.h>
 
 namespace safeheron {
-namespace secure_buffer {
+namespace sbuf {
 
 /// Stateless allocator that wipes memory before releasing it.
 template <typename T>
@@ -38,7 +38,7 @@ struct SecureAllocator {
     bool operator!=(const SecureAllocator<U>&) const noexcept { return false; }
 };
 
-} // namespace secure_buffer
+} // namespace sbuf
 } // namespace safeheron
 
 #endif // SAFEHERON_SECURE_ALLOCATOR_H

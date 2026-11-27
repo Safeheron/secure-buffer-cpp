@@ -6,7 +6,7 @@
 
 int main() {
     std::uint8_t raw[32] = {};
-    safeheron::secure_buffer::compat::span<const std::uint8_t> d = raw;
+    safeheron::sbuf::span<const std::uint8_t> d = raw;
     auto bad = d.subspan<2, SIZE_MAX - 1>();
     (void)bad;
     return 0;

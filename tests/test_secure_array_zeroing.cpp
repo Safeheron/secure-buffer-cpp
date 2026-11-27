@@ -61,7 +61,7 @@ namespace {
     void arm(void* p, size_t n) { reset(); g_target = p; g_target_size = n; g_armed = true; }
 }
 
-using safeheron::secure_buffer::SecureArray;
+using safeheron::sbuf::SecureArray;
 
 TEST(SecureArrayZeroingTest, DestructorWipesBeforeFree) {
     using SA = SecureArray<uint8_t, 64>;

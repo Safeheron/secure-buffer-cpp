@@ -1,6 +1,6 @@
-// compat::span tests. The same source is also built as C++20 against std::span
+// sbuf::span tests. The same source is also built as C++20 against std::span
 // (SB_TEST_STD_SPAN): every check outside the fallback-only blocks must hold for
-// both, which keeps compat::span a strict subset of std::span.
+// both, which keeps sbuf::span a strict subset of std::span.
 #include <gtest/gtest.h>
 #include <secure-buffer/secure_buffer.h>
 
@@ -22,13 +22,13 @@
 #define SB_DYNAMIC_EXTENT std::dynamic_extent
 #else
 #include <secure-buffer/compat/span.h>
-#define SB_SPAN safeheron::secure_buffer::compat::span
-#define SB_DYNAMIC_EXTENT safeheron::secure_buffer::compat::dynamic_extent
+#define SB_SPAN safeheron::sbuf::span
+#define SB_DYNAMIC_EXTENT safeheron::sbuf::dynamic_extent
 #endif
 
-using safeheron::secure_buffer::SecureArray;
-using safeheron::secure_buffer::SecureBytes;
-using safeheron::secure_buffer::secure_cleanse;
+using safeheron::sbuf::SecureArray;
+using safeheron::sbuf::SecureBytes;
+using safeheron::sbuf::secure_cleanse;
 using u8 = std::uint8_t;
 
 namespace {
@@ -48,6 +48,20 @@ struct brace_init_ptr_count<S, std::void_t<decltype(std::declval<void (&)(S)>()(
 constexpr int kInts[4] = {1, 2, 3, 4};
 
 } // namespace
+
+// A span argument does not make this library's namespace an associated
+// namespace (as with std::span), so an unqualified call never finds its
+// functions through argument-dependent lookup.
+namespace {
+template <class S, class = void> struct adl_finds_constant_time_equal : std::false_type {};
+template <class S>
+struct adl_finds_constant_time_equal<
+    S, std::void_t<decltype(constant_time_equal(std::declval<S>(), std::declval<S>()))>>
+    : std::true_type {};
+} // namespace
+static_assert(!adl_finds_constant_time_equal<SB_SPAN<const u8>>::value &&
+                  !adl_finds_constant_time_equal<SB_SPAN<const u8, 4>>::value,
+              "an unqualified call with span arguments does not find constant_time_equal");
 
 // --- Construction, conversion and deduced types (both backends) ---
 
@@ -206,9 +220,7 @@ constexpr int iterator_walk() {
 static_assert(iterator_walk() == 21, "iterator operations are usable in constant expressions");
 
 #if !defined(SB_TEST_STD_SPAN)
-// --- compat::span only: properties std::span does not promise, or lacks ---
-
-namespace compat = safeheron::secure_buffer::compat;
+// --- sbuf::span only: properties std::span does not promise, or lacks ---
 
 namespace {
 
@@ -226,15 +238,22 @@ template <class A, class B>
 struct can_compare_equal<A, B, std::void_t<decltype(std::declval<A>() == std::declval<B>())>>
     : std::true_type {};
 
-using FixedIt = compat::span<int, 4>::iterator;
+using FixedIt = SB_SPAN<int, 4>::iterator;
 
 } // namespace
 
-static_assert(!std::is_constructible<compat::span<int>::iterator, int*>::value &&
-              !std::is_constructible<compat::span<int>::iterator, std::nullptr_t>::value &&
-              !std::is_convertible<std::nullptr_t, compat::span<int>::iterator>::value,
+static_assert(std::is_same<safeheron::sbuf::span<int>, safeheron::sbuf::compat::span<int>>::value &&
+                  std::is_same<safeheron::sbuf::span<const u8, 4>,
+                               safeheron::sbuf::compat::span<const u8, 4>>::value,
+              "sbuf::span and compat::span are one type");
+static_assert(safeheron::sbuf::dynamic_extent == safeheron::sbuf::compat::dynamic_extent,
+              "sbuf::dynamic_extent is compat::dynamic_extent");
+
+static_assert(!std::is_constructible<SB_SPAN<int>::iterator, int*>::value &&
+              !std::is_constructible<SB_SPAN<int>::iterator, std::nullptr_t>::value &&
+              !std::is_convertible<std::nullptr_t, SB_SPAN<int>::iterator>::value,
               "no iterator from a pointer: take a pointer from data()");
-static_assert(std::is_trivially_copyable<compat::span<int>::iterator>::value,
+static_assert(std::is_trivially_copyable<SB_SPAN<int>::iterator>::value,
               "iterators are trivially copyable");
 static_assert(!std::is_same<FixedIt, It>::value && !std::is_convertible<FixedIt, It>::value &&
               !std::is_convertible<It, FixedIt>::value &&
@@ -267,27 +286,27 @@ static_assert(noexcept(*std::declval<const It&>()) && noexcept(std::declval<cons
               noexcept(std::declval<const It&>() > std::declval<const It&>()) &&
               noexcept(std::declval<const It&>() <= std::declval<const It&>()) &&
               noexcept(std::declval<const It&>() >= std::declval<const It&>()) &&
-              noexcept(It()) && noexcept(std::declval<const compat::span<int>&>().begin()),
+              noexcept(It()) && noexcept(std::declval<const SB_SPAN<int>&>().begin()),
               "every iterator operation is noexcept");
-static_assert(std::is_trivially_copyable<compat::span<int>>::value &&
-              std::is_trivially_copyable<compat::span<int, 4>>::value,
+static_assert(std::is_trivially_copyable<SB_SPAN<int>>::value &&
+              std::is_trivially_copyable<SB_SPAN<int, 4>>::value,
               "spans are trivially copyable");
-static_assert(!has_cbegin<compat::span<int>>::value, "no cbegin(), as in C++20 std::span");
-static_assert(noexcept(compat::span<int>(std::declval<int*>(), std::size_t{})) &&
-              noexcept(std::declval<const compat::span<int>&>()[0]) &&
-              noexcept(std::declval<const compat::span<int>&>().first(0)) &&
-              noexcept(std::declval<const compat::span<int>&>().last(0)) &&
-              noexcept(std::declval<const compat::span<int>&>().subspan(0, 0)) &&
-              noexcept(std::declval<const compat::span<int>&>().first<1>()) &&
-              noexcept(std::declval<const compat::span<int>&>().last<1>()) &&
-              noexcept(std::declval<const compat::span<int>&>().subspan<1, 1>()),
+static_assert(!has_cbegin<SB_SPAN<int>>::value, "no cbegin(), as in C++20 std::span");
+static_assert(noexcept(SB_SPAN<int>(std::declval<int*>(), std::size_t{})) &&
+              noexcept(std::declval<const SB_SPAN<int>&>()[0]) &&
+              noexcept(std::declval<const SB_SPAN<int>&>().first(0)) &&
+              noexcept(std::declval<const SB_SPAN<int>&>().last(0)) &&
+              noexcept(std::declval<const SB_SPAN<int>&>().subspan(0, 0)) &&
+              noexcept(std::declval<const SB_SPAN<int>&>().first<1>()) &&
+              noexcept(std::declval<const SB_SPAN<int>&>().last<1>()) &&
+              noexcept(std::declval<const SB_SPAN<int>&>().subspan<1, 1>()),
               "every operation is noexcept");
-static_assert(!std::is_constructible<compat::span<const u8>, const std::vector<u8>&>::value &&
-              !std::is_constructible<compat::span<const u8>, const SecureBytes&>::value &&
-              !std::is_constructible<compat::span<const u8>, const SecureArray<u8, 4>&>::value &&
-              !std::is_constructible<compat::span<const u8, 4>, const std::vector<u8>&>::value &&
-              !std::is_constructible<compat::span<const u8, 4>, const SecureBytes&>::value &&
-              !std::is_constructible<compat::span<const u8, 4>, const SecureArray<u8, 4>&>::value,
+static_assert(!std::is_constructible<SB_SPAN<const u8>, const std::vector<u8>&>::value &&
+              !std::is_constructible<SB_SPAN<const u8>, const SecureBytes&>::value &&
+              !std::is_constructible<SB_SPAN<const u8>, const SecureArray<u8, 4>&>::value &&
+              !std::is_constructible<SB_SPAN<const u8, 4>, const std::vector<u8>&>::value &&
+              !std::is_constructible<SB_SPAN<const u8, 4>, const SecureBytes&>::value &&
+              !std::is_constructible<SB_SPAN<const u8, 4>, const SecureArray<u8, 4>&>::value,
               "no container constructor: borrow through data() and size()");
 #endif
 
@@ -611,13 +630,13 @@ TEST(CompatSpanBorrowTest, CleanseByOwnerIsVisibleThroughView) {
     EXPECT_TRUE(all_zero(varr));
 }
 
-// --- Preconditions (compat::span only, debug builds) ---
+// --- Preconditions (sbuf::span only, debug builds) ---
 
 #if !defined(SB_TEST_STD_SPAN) && !defined(NDEBUG) && GTEST_HAS_DEATH_TEST && !defined(_MSC_VER)
 TEST(CompatSpanDeathTest, RunTimePreconditionsAreAsserted) {
     u8 raw[4] = {};
-    compat::span<u8> s = raw;
-    using S4 = compat::span<u8, 4>;
+    SB_SPAN<u8> s = raw;
+    using S4 = SB_SPAN<u8, 4>;
     EXPECT_DEATH((void)s[4], "[Aa]ssertion");
     EXPECT_DEATH((void)s.first(SIZE_MAX), "[Aa]ssertion");
     EXPECT_DEATH((void)s.last(SIZE_MAX), "[Aa]ssertion");
@@ -626,12 +645,12 @@ TEST(CompatSpanDeathTest, RunTimePreconditionsAreAsserted) {
     // 2 + count wraps around, so a single added comparison would pass
     EXPECT_DEATH((void)s.subspan(2, SIZE_MAX - 1), "[Aa]ssertion");
     EXPECT_DEATH((void)S4(raw, 3), "[Aa]ssertion");
-    EXPECT_DEATH((void)S4(compat::span<u8>(raw, 3)), "[Aa]ssertion");
+    EXPECT_DEATH((void)S4(SB_SPAN<u8>(raw, 3)), "[Aa]ssertion");
 }
 
 TEST(CompatSpanDeathTest, CompileTimeSlicesOfDynamicSpanAreAsserted) {
     u8 raw[4] = {};
-    compat::span<u8> s = raw;
+    SB_SPAN<u8> s = raw;
     EXPECT_DEATH((void)s.first<5>(), "[Aa]ssertion");
     EXPECT_DEATH((void)s.last<5>(), "[Aa]ssertion");
     EXPECT_DEATH((void)s.subspan<5>(), "[Aa]ssertion");

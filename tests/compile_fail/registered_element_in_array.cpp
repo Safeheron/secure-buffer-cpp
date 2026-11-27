@@ -10,10 +10,10 @@ struct HasDestructor {
     ~HasDestructor() {}
 };
 template <>
-struct safeheron::secure_buffer::enable_secure_cleanse<HasDestructor> : std::true_type {};
+struct safeheron::sbuf::enable_secure_cleanse<HasDestructor> : std::true_type {};
 
 int main() {
     std::array<HasDestructor, 2> x;
-    safeheron::secure_buffer::secure_cleanse(x);
+    safeheron::sbuf::secure_cleanse(x);
     return 0;
 }

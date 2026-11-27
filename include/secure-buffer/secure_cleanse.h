@@ -12,15 +12,15 @@
 #include <secure-buffer/secure_memzero.h>
 
 namespace safeheron {
-namespace secure_buffer {
+namespace sbuf {
 
 /// Specialize as std::true_type to declare that every byte of T is data
 /// stored inline (no pointer, view or handle members) and that all-zero bytes
 /// are a valid value of T. secure_cleanse and ScopedCleanse then accept T and
 /// arrays of T.
 /// A specialization may be written at global scope with the qualified name
-/// (template <> struct safeheron::secure_buffer::enable_secure_cleanse<X> ...)
-/// or inside namespace safeheron::secure_buffer, but not inside the namespace of
+/// (template <> struct safeheron::sbuf::enable_secure_cleanse<X> ...)
+/// or inside namespace safeheron::sbuf, but not inside the namespace of
 /// X. It must be visible in every translation unit that wipes T.
 template <typename T>
 struct enable_secure_cleanse : std::false_type {};
@@ -138,7 +138,7 @@ private:
 template <typename T>
 ScopedCleanse(T&) -> ScopedCleanse<T>;
 
-} // namespace secure_buffer
+} // namespace sbuf
 } // namespace safeheron
 
 #endif // SAFEHERON_SECURE_CLEANSE_H

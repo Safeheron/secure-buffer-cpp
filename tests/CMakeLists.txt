@@ -53,7 +53,7 @@ add_secure_buffer_test(test_secure_utils_compare test_secure_utils_compare.cpp)
 add_secure_buffer_test(test_secure_utils_convert test_secure_utils_convert.cpp)
 add_secure_buffer_test(test_compat_span test_compat_span.cpp)
 # C++20-only targets: test_compat_span_std builds the span tests against
-# std::span (compat::span must be a strict subset of it); test_comparison_cxx20
+# std::span (sbuf::span must be a strict subset of it); test_comparison_cxx20
 # and the *_cxx20 compile-fail cases (tests/compile_fail) pin the rewritten
 # comparison operators. A compiler with C++20 support may still use a standard
 # library without std::span or a usable <compare>, so probe each in C++20 mode

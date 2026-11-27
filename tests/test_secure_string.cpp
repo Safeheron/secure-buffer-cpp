@@ -12,7 +12,7 @@
 #include <utility>
 #include <vector>
 
-using namespace safeheron::secure_buffer;
+using namespace safeheron::sbuf;
 
 namespace {
 

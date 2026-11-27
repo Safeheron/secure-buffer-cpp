@@ -13,7 +13,7 @@
 #include <secure-buffer/secure_string.h>
 
 namespace safeheron {
-namespace secure_buffer {
+namespace sbuf {
 
 // --- Conversion from and to std::string ---
 
@@ -73,8 +73,8 @@ inline SecureString to_secure_string(const std::string& str) {
 
 /// Returns false immediately if the sizes differ; the size is not secret.
 /// For equal sizes, compares in time that depends on the size only.
-[[nodiscard]] inline bool constant_time_equal(compat::span<const std::uint8_t> lhs,
-                                              compat::span<const std::uint8_t> rhs) noexcept {
+[[nodiscard]] inline bool constant_time_equal(span<const std::uint8_t> lhs,
+                                              span<const std::uint8_t> rhs) noexcept {
     if (lhs.size() != rhs.size()) return false;
     if (lhs.empty()) return true;
     return constant_time_equal(lhs.data(), rhs.data(), lhs.size());
@@ -89,7 +89,7 @@ template <typename T, std::size_t N>
     return constant_time_equal(lhs.data(), rhs.data(), N * sizeof(T));
 }
 
-} // namespace secure_buffer
+} // namespace sbuf
 } // namespace safeheron
 
 #endif // SAFEHERON_SECURE_UTILS_H

@@ -14,7 +14,7 @@
 #include <secure-buffer/secure_allocator.h>
 
 namespace safeheron {
-namespace secure_buffer {
+namespace sbuf {
 
 // SecureString casts between uint8_t* and char*, which is valid only if
 // uint8_t is a character type.
@@ -43,7 +43,7 @@ SecureBytes make_secure_bytes() {
     return SecureBytes(N, 0);
 }
 
-} // namespace secure_buffer
+} // namespace sbuf
 } // namespace safeheron
 
 #endif // SAFEHERON_SECURE_BYTES_H

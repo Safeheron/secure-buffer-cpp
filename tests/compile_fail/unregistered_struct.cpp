@@ -10,6 +10,6 @@ struct Plain {
 
 int main() {
     Plain x;
-    safeheron::secure_buffer::secure_cleanse(x);
+    safeheron::sbuf::secure_cleanse(x);
     return 0;
 }
