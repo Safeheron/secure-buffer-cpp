@@ -5,7 +5,9 @@
 #define SAFEHERON_SECURE_UTILS_H
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
+#include <secure-buffer/compat/span.h>
 #include <secure-buffer/secure_array.h>
 #include <secure-buffer/secure_bytes.h>
 #include <secure-buffer/secure_string.h>
@@ -32,6 +34,7 @@ inline SecureString to_secure_string(const std::string& str) {
 
 // --- Constant-time comparison ---
 // Only equality is offered: an ordering would reveal where inputs differ.
+// The raw-pointer and byte-span overloads are not found by argument-dependent lookup; call them qualified.
 
 /// Compares len bytes in time that depends on len only.
 // No branch on the data and no early exit.
@@ -63,6 +66,15 @@ inline SecureString to_secure_string(const std::string& str) {
 
 [[nodiscard]] inline bool constant_time_equal(const SecureString& lhs,
                                               const SecureString& rhs) noexcept {
+    if (lhs.size() != rhs.size()) return false;
+    if (lhs.empty()) return true;
+    return constant_time_equal(lhs.data(), rhs.data(), lhs.size());
+}
+
+/// Returns false immediately if the sizes differ; the size is not secret.
+/// For equal sizes, compares in time that depends on the size only.
+[[nodiscard]] inline bool constant_time_equal(compat::span<const std::uint8_t> lhs,
+                                              compat::span<const std::uint8_t> rhs) noexcept {
     if (lhs.size() != rhs.size()) return false;
     if (lhs.empty()) return true;
     return constant_time_equal(lhs.data(), rhs.data(), lhs.size());

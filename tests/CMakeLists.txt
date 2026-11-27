@@ -31,6 +31,53 @@ add_secure_buffer_test(test_secure_array test_secure_array.cpp)
 add_secure_buffer_test(test_secure_string test_secure_string.cpp)
 add_secure_buffer_test(test_secure_utils_compare test_secure_utils_compare.cpp)
 add_secure_buffer_test(test_secure_utils_convert test_secure_utils_convert.cpp)
+add_secure_buffer_test(test_compat_span test_compat_span.cpp)
+# C++20-only targets: test_compat_span_std builds the span tests against
+# std::span (compat::span must be a strict subset of it); test_comparison_cxx20
+# and the *_cxx20 compile-fail cases (tests/compile_fail) pin the rewritten
+# comparison operators. A compiler with C++20 support may still use a standard
+# library without std::span or a usable <compare>, so probe each in C++20 mode
+# (the checks honour CMAKE_CXX_STANDARD, which the block overrides) and skip
+# the targets whose probe fails.
+if("cxx_std_20" IN_LIST CMAKE_CXX_COMPILE_FEATURES)
+    include(CheckCXXSourceCompiles)
+    block(SCOPE_FOR VARIABLES)
+        set(CMAKE_CXX_STANDARD 20)
+        set(CMAKE_CXX_STANDARD_REQUIRED ON)
+        check_cxx_source_compiles([[
+#include <span>
+#if !defined(__cpp_lib_span) || __cpp_lib_span < 202002L
+#error "std::span is not available"
+#endif
+int main() {
+    int a[2] = {0, 1};
+    std::span<int> s(a);
+    return s[0];
+}
+]] SB_HAS_CXX20_STD_SPAN)
+        # Functional check only: some standard libraries ship a usable <compare>
+        # before they define __cpp_lib_three_way_comparison.
+        check_cxx_source_compiles([[
+#include <compare>
+#if !defined(__cpp_impl_three_way_comparison)
+#error "three-way comparison is not available"
+#endif
+int main() {
+    int a = 0;
+    int b = 1;
+    std::strong_ordering r = a <=> b;
+    return r < 0 ? 0 : 1;
+}
+]] SB_HAS_CXX20_THREE_WAY)
+    endblock()
+endif()
+if(SB_HAS_CXX20_STD_SPAN)
+    add_secure_buffer_test(test_compat_span_std test_compat_span.cpp)
+    set_target_properties(test_compat_span_std PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
+    target_compile_definitions(test_compat_span_std PRIVATE SB_TEST_STD_SPAN)
+else()
+    message(STATUS "C++20 std::span not available: skipping test_compat_span_std")
+endif()
 
 # Replaces global operator new/delete: needs its own executable
 add_secure_buffer_test(test_secure_allocator_zeroing test_secure_allocator_zeroing.cpp)
@@ -81,13 +128,15 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     endif()
 endif()
 
-# C++20 rewritten comparisons are only checkable where the toolchain supports C++20
-if("cxx_std_20" IN_LIST CMAKE_CXX_COMPILE_FEATURES)
+# C++20 rewritten comparisons are only checkable in C++20 mode with a usable <compare>
+if(SB_HAS_CXX20_THREE_WAY)
     add_executable(test_comparison_cxx20 test_comparison_cxx20.cpp)
     target_link_libraries(test_comparison_cxx20 PRIVATE safeheron::secure-buffer)
     target_compile_options(test_comparison_cxx20 PRIVATE ${TEST_COMPILE_OPTIONS})
     set_target_properties(test_comparison_cxx20 PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
     add_test(NAME test_comparison_cxx20 COMMAND test_comparison_cxx20)
+else()
+    message(STATUS "C++20 three-way comparison not available: skipping test_comparison_cxx20 and the *_cxx20 compile-fail cases")
 endif()
 
 # Header-hygiene: no platform macros in public headers

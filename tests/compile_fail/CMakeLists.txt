@@ -35,6 +35,17 @@ add_compile_fail_test(unregistered_struct unregistered_struct.cpp
 add_compile_fail_test(secure_array_registered_element secure_array_registered_element.cpp
     "SecureArray elements must be integers or std::byte")
 
+add_compile_fail_test(span_first_beyond_extent span_first_beyond_extent.cpp
+    "span::first<Count>: Count exceeds the extent")
+add_compile_fail_test(span_last_beyond_extent span_last_beyond_extent.cpp
+    "span::last<Count>: Count exceeds the extent")
+add_compile_fail_test(span_subspan_offset_beyond_extent span_subspan_offset_beyond_extent.cpp
+    "span::subspan<Offset, Count>: Offset exceeds the extent")
+add_compile_fail_test(span_subspan_count_beyond_extent span_subspan_count_beyond_extent.cpp
+    "span::subspan<Offset, Count>: Count exceeds the extent minus Offset")
+add_compile_fail_test(span_subspan_count_dynamic_source span_subspan_count_dynamic_source.cpp
+    "span::subspan<Offset, Count>: Count exceeds the extent minus Offset")
+
 set(DELETED_COMPARISON "deleted (function|operator)")
 
 add_compile_fail_test(secure_bytes_equal secure_bytes_equal.cpp
@@ -47,7 +58,9 @@ add_compile_fail_test(secure_string_equal secure_string_equal.cpp
     "${DELETED_COMPARISON}")
 
 # C++20 rewrites >, <=, >= and <=> in terms of other operators; pin them.
-if("cxx_std_20" IN_LIST CMAKE_CXX_COMPILE_FEATURES)
+# SB_HAS_CXX20_THREE_WAY (C++20 mode with a usable <compare>) is probed in
+# tests/CMakeLists.txt, which also reports when these cases are skipped.
+if(SB_HAS_CXX20_THREE_WAY)
     add_compile_fail_test(secure_bytes_greater_cxx20 secure_bytes_greater_cxx20.cpp
         "${DELETED_COMPARISON}")
     add_compile_fail_test(secure_bytes_spaceship_cxx20 secure_bytes_spaceship_cxx20.cpp
