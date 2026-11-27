@@ -64,10 +64,11 @@ std::string unsafe = to_unsecure_string(bytes);
 | `secure_cleanse` / `ScopedCleanse` | Wipe an existing fixed-size object (integer, `std::byte`, a plain-data type registered with `enable_secure_cleanse`, or a `std::array` or built-in array of them) in place, or when a guard leaves scope. `secure_cleanse` also accepts a `SecureArray`; `ScopedCleanse` does not, since `SecureArray` wipes itself. |
 | `SecureAllocator<T>` | Allocator that calls `secure_memzero` before each deallocation. |
 | `secure_memzero` | Portable memory zeroing that the compiler cannot elide. |
+| `version()` / `SECURE_BUFFER_VERSION_*` | The library version: `version()` reports the linked library at run time, the macros in `version.h` the headers at compile time. |
 
 ## Integration
 
-`safeheron::secure-buffer` is a static library built from source with your own toolchain; no prebuilt binaries are shipped. On desktop platforms, WebAssembly, Android and iOS it is consumed as an ordinary CMake target. SGX enclaves are the exception: the source file must be compiled with the enclave toolchain, for example as a trusted library via [Safeheron ssgx](https://github.com/Safeheron/ssgx), since a host-built archive cannot be linked into an enclave.
+`safeheron::secure-buffer` is a static library built from source with your own toolchain; no prebuilt binaries are shipped. On desktop platforms, WebAssembly, Android and iOS it is consumed as an ordinary CMake target. SGX enclaves are the exception: the source files must be compiled with the enclave toolchain, for example as a trusted library via [Safeheron ssgx](https://github.com/Safeheron/ssgx), since a host-built archive cannot be linked into an enclave.
 
 [USAGE.md](USAGE.md) documents the contracts of each type; [PLATFORMS.md](PLATFORMS.md) covers Android, iOS, WebAssembly, Nitro and SGX builds.
 
@@ -84,7 +85,7 @@ cmake --install build --config Release --prefix <prefix>
 Then point `CMAKE_PREFIX_PATH` at `<prefix>`:
 
 ```cmake
-find_package(secure-buffer 0.11.0 REQUIRED)
+find_package(secure-buffer 0.12 REQUIRED)
 target_link_libraries(my_project PRIVATE safeheron::secure-buffer)
 ```
 
@@ -96,7 +97,7 @@ include(FetchContent)
 FetchContent_Declare(
     secure-buffer
     GIT_REPOSITORY https://github.com/Safeheron/secure-buffer-cpp.git
-    GIT_TAG v0.11.0
+    GIT_TAG v0.12.0
 )
 FetchContent_MakeAvailable(secure-buffer)
 

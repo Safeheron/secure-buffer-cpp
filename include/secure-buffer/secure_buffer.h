@@ -14,5 +14,6 @@
 #include <secure-buffer/secure_array.h>
 #include <secure-buffer/secure_utils.h>
 #include <secure-buffer/compat/span.h>
+#include <secure-buffer/version.h>
 
 #endif // SAFEHERON_SECURE_BUFFER_H

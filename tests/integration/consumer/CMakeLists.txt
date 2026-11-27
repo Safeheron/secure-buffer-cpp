@@ -6,6 +6,7 @@ project(secure_buffer_consumer LANGUAGES CXX)
 
 set(SB_CONSUMER_MODE "package" CACHE STRING "How secure-buffer is brought in: package or subdirectory")
 set(SB_SOURCE_DIR "" CACHE PATH "secure-buffer source tree (subdirectory mode)")
+set(SB_FIND_VERSION "" CACHE STRING "Version requested from find_package (package mode)")
 set(SB_CONSUMER_CXX_STANDARD "" CACHE STRING
     "If set, CMAKE_CXX_STANDARD is set to it as a normal variable before add_subdirectory()")
 option(SB_CONSUMER_ENABLE_TESTS
@@ -14,7 +15,10 @@ option(SB_CONSUMER_ENABLE_TESTS
 enable_testing()
 
 if(SB_CONSUMER_MODE STREQUAL "package")
-    find_package(secure-buffer 0.11.0 REQUIRED)
+    if(SB_FIND_VERSION STREQUAL "")
+        message(FATAL_ERROR "SB_FIND_VERSION is required in package mode")
+    endif()
+    find_package(secure-buffer ${SB_FIND_VERSION} REQUIRED)
 elseif(SB_CONSUMER_MODE STREQUAL "subdirectory")
     if(NOT SB_CONSUMER_CXX_STANDARD STREQUAL "")
         set(CMAKE_CXX_STANDARD ${SB_CONSUMER_CXX_STANDARD})
@@ -22,6 +26,9 @@ elseif(SB_CONSUMER_MODE STREQUAL "subdirectory")
     if(SB_CONSUMER_ENABLE_TESTS)
         set(SECURE_BUFFER_BUILD_TESTS ON)
     endif()
+    # A parent variable of the same name as the one cmake/version.cmake takes in script mode: the
+    # library must still read its own version.h, not this.
+    set(SECURE_BUFFER_VERSION_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/no-such-version.h)
     add_subdirectory("${SB_SOURCE_DIR}" secure-buffer)
     # Reported for run.sh: the library has no C++20 modules to scan.
     get_target_property(sb_scan_for_modules secure-buffer CXX_SCAN_FOR_MODULES)
@@ -30,7 +37,8 @@ else()
     message(FATAL_ERROR "SB_CONSUMER_MODE must be package or subdirectory, got '${SB_CONSUMER_MODE}'")
 endif()
 
-# An executable that calls secure_memzero directly.
+# An executable that calls secure_memzero directly and compares version() with
+# the headers' version.
 add_executable(consumer_static main.cpp)
 target_link_libraries(consumer_static PRIVATE safeheron::secure-buffer)
 add_test(NAME consumer_static COMMAND consumer_static)

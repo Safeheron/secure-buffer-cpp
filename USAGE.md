@@ -367,6 +367,26 @@ This covers named objects, temporaries, copies, and objects destroyed by `std::o
 - The type is no longer trivially copyable, so it cannot be registered with `enable_secure_cleanse`; the two approaches are alternatives.
 - Every value of the type is wiped, including ones you hand out publicly.
 
+## Versions
+
+The version is written once, in `<secure-buffer/version.h>`:
+
+- `SECURE_BUFFER_VERSION_MAJOR`, `SECURE_BUFFER_VERSION_MINOR`, `SECURE_BUFFER_VERSION_PATCH` and `SECURE_BUFFER_VERSION_STRING` (for example `"0.12.0"`) give the version of the headers your code is compiled with.
+- `safeheron::sbuf::version()` returns the version of the library that is linked in. If it differs from `SECURE_BUFFER_VERSION_STRING`, the headers and the library do not belong together. It is meant for diagnostics; it is not an ABI or integrity check.
+
+To compile code only for a given version or later, compare the major and minor numbers together:
+
+```cpp
+#include <secure-buffer/version.h>
+
+#if SECURE_BUFFER_VERSION_MAJOR > 0 || \
+    (SECURE_BUFFER_VERSION_MAJOR == 0 && SECURE_BUFFER_VERSION_MINOR >= 12)
+// code for 0.12 and later
+#endif
+```
+
+Before 1.0.0 every minor release may change the API, so an installed package accepts only requests for its own minor version. Request the minor version, as in `find_package(secure-buffer 0.12 REQUIRED)`, and move to a new minor version deliberately.
+
 ## Per-Platform Builds
 
 See [PLATFORMS.md](PLATFORMS.md).
