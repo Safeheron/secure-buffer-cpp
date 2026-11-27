@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
+#include <secure-buffer/compat/span.h>
 #include <secure-buffer/secure_array.h>
 #include <secure-buffer/secure_utils.h>
+#include <array>
 #include <cstdint>
 #include <utility>
 
@@ -151,4 +153,61 @@ TEST(ConstantTimeEqualSecureArrayTest, ZeroLength) {
     SecureArray<uint8_t, 0> a;
     SecureArray<uint8_t, 0> b;
     EXPECT_TRUE(constant_time_equal(a, b));
+}
+
+// --- constant_time_equal(span<const uint8_t>, span<const uint8_t>) ---
+
+using CSpan = compat::span<const uint8_t>;
+
+static_assert(noexcept(constant_time_equal(CSpan(), CSpan())), "noexcept");
+
+TEST(ConstantTimeEqualSpanTest, Equal) {
+    uint8_t a[] = {1, 2, 3};
+    uint8_t b[] = {1, 2, 3};
+    EXPECT_TRUE(constant_time_equal(CSpan(a), CSpan(b)));
+}
+
+TEST(ConstantTimeEqualSpanTest, NotEqualLastByte) {
+    uint8_t a[] = {1, 2, 3};
+    uint8_t b[] = {1, 2, 4};
+    EXPECT_FALSE(constant_time_equal(CSpan(a), CSpan(b)));
+}
+
+TEST(ConstantTimeEqualSpanTest, DifferentSizes) {
+    uint8_t a[] = {1, 2, 3};
+    uint8_t b[] = {1, 2, 3, 4};
+    EXPECT_FALSE(constant_time_equal(CSpan(a), CSpan(b)));
+}
+
+TEST(ConstantTimeEqualSpanTest, BothEmpty) {
+    EXPECT_TRUE(constant_time_equal(CSpan(), CSpan()));
+}
+
+TEST(ConstantTimeEqualSpanTest, OneEmpty) {
+    uint8_t a[] = {1, 2, 3};
+    EXPECT_FALSE(constant_time_equal(CSpan(a), CSpan()));
+}
+
+TEST(ConstantTimeEqualSpanTest, TypedNullWithZeroLength) {
+    EXPECT_TRUE(constant_time_equal(CSpan(static_cast<const uint8_t*>(nullptr), 0), CSpan()));
+}
+
+TEST(ConstantTimeEqualSpanTest, ImplicitConversions) {
+    uint8_t raw1[4] = {1, 2, 3, 4}, raw2[4] = {1, 2, 3, 4};
+    std::array<uint8_t, 4> arr1{{1, 2, 3, 4}};
+    std::array<uint8_t, 4> arr2 = arr1;
+    compat::span<uint8_t> mut(raw1);
+    compat::span<const uint8_t, 4> fixed(raw2);
+    EXPECT_TRUE(constant_time_equal(raw1, raw2));
+    EXPECT_TRUE(constant_time_equal(arr1, arr2));
+    EXPECT_TRUE(constant_time_equal(mut, fixed));
+    EXPECT_TRUE(constant_time_equal(fixed, arr1));
+    arr2[3] = 0;
+    EXPECT_FALSE(constant_time_equal(arr1, arr2));
+}
+
+TEST(ConstantTimeEqualSpanTest, ZeroLengthStaticViews) {
+    compat::span<const uint8_t, 0> e1;
+    compat::span<const uint8_t, 0> e2;
+    EXPECT_TRUE(constant_time_equal(e1, e2));
 }

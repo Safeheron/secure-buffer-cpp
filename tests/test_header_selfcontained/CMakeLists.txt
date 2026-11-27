@@ -37,6 +37,11 @@ file(WRITE "${minmax_stub}"
     "  safeheron::secure_buffer::SecureArray<unsigned char, 4> a; a[0] = 1;\n"
     "  safeheron::secure_buffer::secure_cleanse(a);\n"
     "  if (a[0] != 0) return 1;\n"
+    "  if (safeheron::secure_buffer::as_span(a).first<1>()[0] != 0) return 1;\n"
+    "  safeheron::secure_buffer::compat::span<const unsigned char> v(k, 4);\n"
+    "  if (v.subspan(1).size() != 3) return 1;\n"
+    "  if (v.first<2>().size() != 2) return 1;\n"
+    "  if (!safeheron::secure_buffer::constant_time_equal(v, v)) return 1;\n"
     "  return static_cast<int>(s.size()) - 4;\n"
     "}\n")
 add_executable(header_tolerates_minmax_macros "${minmax_stub}")

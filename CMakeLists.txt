@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 project(secure-buffer
-    VERSION 0.9.0
+    VERSION 0.10.0
     LANGUAGES CXX
     DESCRIPTION "C++17 secure-buffer base library (header-first API + tiny compiled core)"
 )
@@ -56,9 +56,16 @@ configure_package_config_file(
     "${CMAKE_CURRENT_BINARY_DIR}/secure-bufferConfig.cmake"
     INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/secure-buffer
 )
+# Before 1.0.0 a minor release may break the public API, so a 0.x package is
+# compatible only within its minor release; from 1.0.0 within its major release.
+if(PROJECT_VERSION_MAJOR EQUAL 0)
+    set(_sb_version_compatibility SameMinorVersion)
+else()
+    set(_sb_version_compatibility SameMajorVersion)
+endif()
 write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/secure-bufferConfigVersion.cmake"
-    COMPATIBILITY SameMajorVersion
+    COMPATIBILITY ${_sb_version_compatibility}
 )
 install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/secure-bufferConfig.cmake"

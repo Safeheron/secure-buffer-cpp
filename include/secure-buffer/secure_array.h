@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <type_traits>
 
+#include <secure-buffer/compat/span.h>
 #include <secure-buffer/secure_cleanse.h>
 #include <secure-buffer/secure_memzero.h>
 
@@ -21,7 +22,8 @@ namespace secure_buffer {
 /// Every copy wipes itself on destruction.
 /// Moves are copies, as for std::array: the source keeps its value until it is
 /// destroyed; call secure_cleanse() to wipe it sooner.
-/// There is no conversion to or from std::array; pass data() and size().
+/// There is no conversion to or from std::array; pass data() and size(),
+/// or borrow a view with as_span() / as_writable_span().
 /// N == 0 is allowed.
 template <typename T, std::size_t N>
 class SecureArray final {
@@ -129,6 +131,26 @@ template <typename T, std::size_t N>
 void secure_cleanse(SecureArray<T, N>& array) noexcept {
     secure_memzero(array.data(), N * sizeof(T));
 }
+
+/// Borrows the elements as a view of compile-time length N. The view does not
+/// extend the array's lifetime and does not wipe anything.
+template <typename T, std::size_t N>
+compat::span<const T, N> as_span(const SecureArray<T, N>& a) noexcept {
+    return compat::span<const T, N>(a.data(), N);
+}
+
+/// Borrows the elements as a modifiable view of compile-time length N. Same
+/// lifetime rules as as_span; it takes a modifiable lvalue, so temporaries are
+/// rejected.
+template <typename T, std::size_t N>
+compat::span<T, N> as_writable_span(SecureArray<T, N>& a) noexcept {
+    return compat::span<T, N>(a.data(), N);
+}
+
+// A view of a temporary would dangle once the array is wiped at the end of
+// the full-expression.
+template <typename T, std::size_t N>
+void as_span(const SecureArray<T, N>&&) = delete;
 
 static_assert(std::is_nothrow_default_constructible<SecureArray<unsigned char, 32>>::value,
               "SecureArray() must be noexcept");

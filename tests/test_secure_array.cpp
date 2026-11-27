@@ -34,6 +34,29 @@ static_assert(noexcept(std::declval<A&>().data()) && noexcept(std::declval<A&>()
 static_assert(noexcept(secure_cleanse(std::declval<A&>())), "secure_cleanse is noexcept");
 static_assert(!detail::is_cleansable<A>::value, "ScopedCleanse rejects it: it wipes itself");
 
+template <class T, class = void> struct can_as_span : std::false_type {};
+template <class T>
+struct can_as_span<T, std::void_t<decltype(as_span(std::declval<T>()))>> : std::true_type {};
+template <class T, class = void> struct can_as_writable_span : std::false_type {};
+template <class T>
+struct can_as_writable_span<T, std::void_t<decltype(as_writable_span(std::declval<T>()))>>
+    : std::true_type {};
+
+static_assert(std::is_same<decltype(as_span(std::declval<const A&>())), compat::span<const uint8_t, 32>>::value &&
+              std::is_same<decltype(as_writable_span(std::declval<A&>())), compat::span<uint8_t, 32>>::value &&
+              std::is_same<decltype(as_span(std::declval<const SecureArray<uint32_t, 4>&>())),
+                           compat::span<const uint32_t, 4>>::value,
+              "as_span keeps the element type and the length");
+static_assert(can_as_span<A&>::value && can_as_span<const A&>::value &&
+              !can_as_span<A>::value && !can_as_span<const A>::value,
+              "no views of temporaries, const or not");
+static_assert(can_as_writable_span<A&>::value && !can_as_writable_span<const A&>::value &&
+              !can_as_writable_span<A>::value,
+              "as_writable_span needs a modifiable lvalue");
+static_assert(noexcept(as_span(std::declval<const A&>())) &&
+              noexcept(as_writable_span(std::declval<A&>())),
+              "as_span and as_writable_span are noexcept");
+
 namespace {
 
 template <typename Arr>
@@ -195,4 +218,46 @@ TEST(SecureArrayTest, ZeroLengthArray) {
         EXPECT_THROW(z.at(0), std::out_of_range);
         EXPECT_THROW(cz.at(0), std::out_of_range);
     }  // destructor runs
+}
+
+TEST(SecureArrayTest, AsSpanBorrowsWithoutCopy) {
+    A a;
+    a[0] = 7;
+    auto v = as_span(a);
+    EXPECT_EQ(v.data(), a.data());
+    EXPECT_EQ(v.size(), 32u);
+    EXPECT_EQ(v[0], 7);
+}
+
+TEST(SecureArrayTest, AsWritableSpanWritesThrough) {
+    A a;
+    auto w = as_writable_span(a);
+    w[31] = 9;
+    EXPECT_EQ(a[31], 9);
+}
+
+TEST(SecureArrayTest, AsSpanCompileTimeSlices) {
+    A a;
+    auto key = as_span(a).subspan<8, 16>();
+    EXPECT_EQ(key.data(), a.data() + 8);
+    static_assert(decltype(key)::extent == 16, "");
+}
+
+TEST(SecureArrayTest, AsSpanSeesCleanse) {
+    A a;
+    a[0] = 1;
+    auto v = as_span(a);
+    secure_cleanse(a);
+    EXPECT_EQ(v[0], 0);
+}
+
+TEST(SecureArrayTest, AsSpanZeroLength) {
+    SecureArray<uint8_t, 0> z;
+    auto v = as_span(z);
+    static_assert(std::is_same<decltype(v), compat::span<const uint8_t, 0>>::value, "");
+    EXPECT_TRUE(v.empty());
+    auto f = v.first<0>();
+    auto s = v.subspan<0>();
+    EXPECT_TRUE(f.empty());
+    EXPECT_TRUE(s.empty());
 }
